@@ -1,7 +1,7 @@
 // Textures
 texture2D diffuseTexture : register(t0);
 texture2D shadowMaps[3] : register(t1);
-TextureCube shadowCubeMaps[3] : register(t2);
+TextureCube shadowCubeMaps[3] : register(t4);
 
 // Samplers
 SamplerState diffuseSampler : register(s0);
@@ -17,15 +17,22 @@ struct VSInput
 struct PSInput
 {
     float4 position : SV_POSITION;    
-    float4 shadowPos[3] : POSITION0;
+    //float4 shadowPos[3] : POSITION0;
     float3 worldPosition : POSITION3;
     float3 normal : NORMAL;
     float2 tex : TEXCOORD0;
 };
 
+struct DirectionalLight
+{
+    float4x4 shadowTransformation;
+    float3 direction;
+    float3 color;
+    float intensity;
+};
+
 struct PointLight
 {
-    float4x4 shadowTransform;
     float3 worldPosition;
     float3 color;
     float intensity;

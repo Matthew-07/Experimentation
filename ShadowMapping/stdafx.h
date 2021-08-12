@@ -32,6 +32,7 @@
 // std data structures
 #include <vector>
 #include <unordered_map>
+#include <list>
 
 // Misc
 #include <string>

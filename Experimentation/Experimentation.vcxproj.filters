@@ -64,13 +64,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="PixelShader.hlsl">
-      <Filter>Shaders</Filter>
-    </CopyFileToFolders>
     <CopyFileToFolders Include="shared.hlsli">
-      <Filter>Shaders</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="VertexShader.hlsl">
       <Filter>Shaders</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="monkey.obj">
@@ -81,6 +75,12 @@
     </CopyFileToFolders>
     <CopyFileToFolders Include="PawnTexture.DDS">
       <Filter>Resource Files</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="PixelShader.hlsl">
+      <Filter>Shaders</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="VertexShader.hlsl">
+      <Filter>Shaders</Filter>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
