@@ -196,7 +196,7 @@ void Application::loadAssets()
     auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
     auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 
-    monkey.loadFromFile("Pawn.obj");
+    monkey.loadFromFile("monkey.obj");
     //monkey = Mesh::GenerateGrid(10, 10, 0.5f, 0.5f);
     monkey.scheduleUpload(m_device.getDevice(), m_commandList);
 
@@ -205,8 +205,8 @@ void Application::loadAssets()
 
     {
         ScratchImage scratchImage;
-        //LoadFromDDSFile(L"texture.DDS", DDS_FLAGS_NONE, nullptr, scratchImage);
-        LoadFromDDSFile(L"PawnTexture.DDS", DDS_FLAGS_NONE, nullptr, scratchImage);
+        LoadFromDDSFile(L"texture.DDS", DDS_FLAGS_NONE, nullptr, scratchImage);
+        //LoadFromDDSFile(L"PawnTexture.DDS", DDS_FLAGS_NONE, nullptr, scratchImage);
 
         const Image *image = scratchImage.GetImage(1, 0, 0);
 

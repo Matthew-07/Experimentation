@@ -79,12 +79,6 @@
     <CopyFileToFolders Include="texture.DDS">
       <Filter>Resource Files</Filter>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="Queen.obj">
-      <Filter>Resource Files</Filter>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="Pawn.obj">
-      <Filter>Resource Files</Filter>
-    </CopyFileToFolders>
     <CopyFileToFolders Include="PawnTexture.DDS">
       <Filter>Resource Files</Filter>
     </CopyFileToFolders>

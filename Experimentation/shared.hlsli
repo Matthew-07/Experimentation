@@ -34,7 +34,7 @@ cbuffer ObjectConstantBuffer : register(b0)
     float4x4 mvp_normalMatrix;
     float k_s;
     float alpha;
-    float2 padding;
+    //float2 padding;
 }
 
 cbuffer SceneConstantBuffer : register(b1)
