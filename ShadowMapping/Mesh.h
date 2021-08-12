@@ -146,6 +146,8 @@ private:
 		case _INT8:
 		case _UINT8:
 			return 1;
+		default:
+			return 0;
 		}
 	}
 };
