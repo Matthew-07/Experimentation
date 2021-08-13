@@ -183,9 +183,9 @@ void Mesh::initAsGrid(UINT width, UINT height, float horizontalSpacing, float ve
 			if (positionDescriptor != nullptr) {
 				UINT offset = 0;
 				char* data = new char[4 * getDataSize(positionDescriptor->type)];
-				convertData(positionDescriptor->type, x * horizontalSpacing - horizontalOffset, data + offset);
+				convertData(positionDescriptor->type, x * horizontalSpacing + horizontalOffset, data + offset);
 				offset += getDataSize(positionDescriptor->type);
-				convertData(positionDescriptor->type, y * verticalSpacing - verticalOffset, data + offset);
+				convertData(positionDescriptor->type, y * verticalSpacing + verticalOffset, data + offset);
 				offset += getDataSize(positionDescriptor->type);
 				convertData(positionDescriptor->type, 0.f, data + offset);
 				offset += getDataSize(positionDescriptor->type);
@@ -217,9 +217,9 @@ void Mesh::initAsGrid(UINT width, UINT height, float horizontalSpacing, float ve
 			if (textureDescriptor != nullptr) {
 				UINT offset = 0;
 				char* data = new char[2 * getDataSize(textureDescriptor->type)];
-				convertData(textureDescriptor->type, (double) x / width, data + offset);
+				convertData(textureDescriptor->type, (double) x / (width-1), data + offset);
 				offset += getDataSize(textureDescriptor->type);
-				convertData(textureDescriptor->type, (double) y / height, data + offset);
+				convertData(textureDescriptor->type, (double) (height-y-1) / (height-1), data + offset);
 
 				memcpy(m_vertices + m_vertexSize * (x + y * width) + textureDescriptor->offset,
 					data, textureDescriptor->size * getDataSize(textureDescriptor->type));
@@ -329,4 +329,11 @@ void Mesh::scheduleUpload(ComPtr<ID3D12Device> m_device, ComPtr<ID3D12GraphicsCo
 		m_indexBufferView.Format = DXGI_FORMAT_R32_UINT;
 		m_indexBufferView.SizeInBytes = m_numberOfIndices * sizeof(UINT32);
 	}
+}
+
+void Mesh::draw(ComPtr<ID3D12GraphicsCommandList> commandList) {
+	commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+	commandList->IASetIndexBuffer(&m_indexBufferView);
+
+	commandList->DrawIndexedInstanced(m_numberOfIndices, 1, 0, 0, 0);
 }

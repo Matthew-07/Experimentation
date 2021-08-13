@@ -2,6 +2,8 @@
 
 float4 main(PSInput pin) : SV_TARGET
 {
+	//return float4(1.f, 0.f, 0.f, 1.f);
+
 	float3 diffuse_color = diffuseTexture.Sample(diffuseSampler, pin.tex).xyz;
 
 	float4 look_direction = float4(normalize(pin.worldPosition.xyz - camera_position.xyz), 0.f);
@@ -12,7 +14,8 @@ float4 main(PSInput pin) : SV_TARGET
 		//float shadowFactor = CalculateShadowFactor(pin.shadowPos[i], i);
 
 		float3 lightDirection = point_lights[i].worldPosition - pin.worldPosition;
-		float shadowFactor = CalculateShadowFactorCube(lightDirection, i);
+		//float shadowFactor = CalculateShadowFactorCube(lightDirection, i);
+		float shadowFactor = 1.f;
 
 		if (shadowFactor > 0.f) {
 			// Compute vectors

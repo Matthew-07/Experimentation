@@ -81,7 +81,9 @@ public:
 		m_indices = obj.m_indices;
 
 		obj.m_vertices = nullptr;
-		obj.m_indices = nullptr;		
+		obj.m_indices = nullptr;
+
+		m_vertexSize = obj.m_vertexSize;
 	}
 
 	void unload() {
@@ -107,6 +109,8 @@ public:
 		vertexBufferUploadHeap.Reset();
 		indexBufferUploadHeap.Reset();
 	}
+
+	void draw(ComPtr<ID3D12GraphicsCommandList> m_commandList);
 
 private:
 	char* m_vertices = nullptr;

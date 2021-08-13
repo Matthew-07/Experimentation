@@ -5,7 +5,7 @@ using namespace Microsoft::WRL;
 
 struct PointLight
 {
-	XMFLOAT3 position = { 0.f, 0.f, 0.f };
+	XMFLOAT3 position = { 0.f, 0.f, 0.f }; float padding;
 	XMFLOAT3 color = { 1.f, 1.f, 1.f };
 	float intensity = 0.f;
 

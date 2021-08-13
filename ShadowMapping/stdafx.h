@@ -23,6 +23,8 @@
 #include <D3Dcompiler.h>
 #include <DirectXMath.h>
 
+#include <pix3.h>
+
 #include <DirectXTex.h>
 
 #pragma comment(lib, "d3d12")

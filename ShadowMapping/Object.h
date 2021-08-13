@@ -37,6 +37,20 @@ public:
 	void scale(XMVECTOR ratios) { m_scaling *= ratios; }
 	void rotate(XMVECTOR quaternion) { m_quaternion = XMQuaternionMultiply(quaternion, m_quaternion); }
 
+	static void uploadMeshes(ComPtr<ID3D12Device> m_device, ComPtr<ID3D12GraphicsCommandList> m_commandList) {
+		for (std::pair<const std::string, Mesh>& pair : m_meshes) {
+			pair.second.scheduleUpload(m_device, m_commandList);
+		}
+	}
+
+	static void finaliseMeshes() {
+		for (std::pair<const std::string, Mesh>& pair : m_meshes) {
+			pair.second.finaliseUpload();
+		}
+	}
+
+	void draw(ComPtr<ID3D12GraphicsCommandList> m_commandList, UINT rootParameterIndex, UINT frameIndex);
+
 private:
 	Device& m_device;
 	UINT m_frameCount = 2;

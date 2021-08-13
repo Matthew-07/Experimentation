@@ -83,6 +83,9 @@
     <CopyFileToFolders Include="monkey.mesh">
       <Filter>Resource Files</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="texture.DDS">
+      <Filter>Resource Files</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="basic_pixel_shader.hlsl">

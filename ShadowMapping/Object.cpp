@@ -5,9 +5,20 @@ std::unordered_map<std::string, Mesh> Object::m_meshes{};
 
 Object::Object(Mesh mesh, std::string meshLabel, Device& device, UINT32 frameCount) : m_device(device)
 {
-	m_meshes.insert(std::make_pair(meshLabel, std::move(mesh)));
+	auto it = m_meshes.find(meshLabel);
+	if (it == m_meshes.end()) {
+		m_meshes.insert(std::make_pair(meshLabel, std::move(mesh)));
 
-	m_frameCount = frameCount;
+		m_frameCount = frameCount;
+
+		it = m_meshes.find(meshLabel);
+		m_mesh = &it->second;
+	}
+	else {
+		m_mesh = &it->second;
+	}
+
+	createConstantBuffer();
 }
 
 Object::Object(std::string filename, Device& device, UINT32 frameCount) : m_device(device)
@@ -25,6 +36,11 @@ Object::Object(std::string filename, Device& device, UINT32 frameCount) : m_devi
 		Mesh mesh{desciptors, 3};
 
 		mesh.loadMeshFromFile(filename.c_str());
+
+		m_meshes.insert(std::make_pair(filename, std::move(mesh)));
+
+		it = m_meshes.find(filename);
+		m_mesh = &it->second;
 	}
 
 	m_frameCount = frameCount;
@@ -36,6 +52,13 @@ void Object::updateConstantBuffer(UINT frameIndex)
 {
 	ObjectConstantBuffer objectConstantBufferData = getObjectCB();
 	memcpy(m_pObjectCbvDataBegin + frameIndex * sizeof(objectConstantBufferData), &objectConstantBufferData, sizeof(objectConstantBufferData));
+}
+
+void Object::draw(ComPtr<ID3D12GraphicsCommandList> m_commandList, UINT rootParameterIndex, UINT frameIndex)
+{
+	m_commandList->SetGraphicsRootConstantBufferView(rootParameterIndex, m_objectConstantBuffer->GetGPUVirtualAddress() + frameIndex * sizeof(ObjectConstantBuffer));
+
+	m_mesh->draw(m_commandList);
 }
 
 ObjectConstantBuffer Object::getObjectCB() const

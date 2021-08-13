@@ -11,6 +11,26 @@ struct PostVertex
 	XMFLOAT2 uv;
 };
 
+struct AmbientLight {
+	XMFLOAT3 color;
+	float intensity;
+};
+
+struct SceneConstantBuffer
+{
+	XMMATRIX view_proj_matrix; // 16
+
+	XMFLOAT3 camera_position; // 3
+	float f; // data cannot cross 16 byte boundaries : 1
+
+	AmbientLight ambient; // 4
+
+	PointLight point_lights[3]; // 8 * 3 = 24
+	UINT32 number_of_lights; // 1
+
+	float padding[64 - 16 - 3 - 1 - 4 - 24 - 1];
+};
+
 class Application : public BaseWindow<Application>
 {
 public:
@@ -31,6 +51,7 @@ private:
 
 	static const UINT FrameCount = 2;
 	bool m_tearingSupport;
+	bool m_windowedMode = true;
 
 	Device m_device;
 
@@ -42,6 +63,7 @@ private:
 	ComPtr<IDXGISwapChain3> m_swapChain;
 	ComPtr<ID3D12Resource> m_renderTargets[FrameCount];
 	ComPtr<ID3D12Resource> m_intermediateRenderTarget;
+	ComPtr<ID3D12Resource> m_depthStencil;
 
 	ComPtr<ID3D12CommandAllocator> m_sceneCommandAllocators[FrameCount];
 	ComPtr<ID3D12CommandAllocator> m_postCommandAllocators[FrameCount];
@@ -55,6 +77,14 @@ private:
 	ComPtr<ID3D12PipelineState> m_shadowsPipelineState;
 	ComPtr<ID3D12PipelineState> m_postPipelineState;
 
+	enum SceneRootParameters {
+		RootObjectConstantBuffer = 0,
+		RootTextureTable = 1,
+		RootSceneShadowCubeMapTable = 2,
+		RootSceneShadowMapTable = 3,		
+		RootSceneConstantBuffer = 4
+	};
+
 	ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
 	ComPtr<ID3D12DescriptorHeap> m_dsvHeap;
 	ComPtr<ID3D12DescriptorHeap> m_cbvSrvHeap;
@@ -62,11 +92,13 @@ private:
 	UINT m_dsvDescriptorSize;
 	UINT m_cbvSrvDescriptorSize;
 
-	ComPtr<ID3D12Resource> m_postVertexBuffer;
-	D3D12_VERTEX_BUFFER_VIEW m_postVertexBufferView;
-
 	std::vector<Object> m_sceneObjects;
 	ShadowMap m_shadowMap;
+	ComPtr<ID3D12Resource> m_texture;
+
+	ComPtr<ID3D12Resource> m_sceneConstantBuffer;
+	SceneConstantBuffer m_sceneConstantBufferData;
+	UINT8* m_pSceneCbvDataBegin;
 
 	Mesh m_rectangle;
 
@@ -75,6 +107,7 @@ private:
 	HANDLE m_fenceEvent;
 	ComPtr<ID3D12Fence> m_fence;
 	UINT64 m_fenceValues[FrameCount];
+	UINT64 m_fenceValue;
 
 	void updatePostViewAndScissor();
 	void createWindowSizeDependentResources();
@@ -88,8 +121,12 @@ private:
 	void createRootSignatures();
 	void createPipelineState();
 
+	void createCommandObjects();
+	void loadAssets();
+
 	void update();
 	void render();
+	void populateCommandLists();
 
 	ComPtr<ID3D10Blob> loadBinary(std::string filename);
 };
