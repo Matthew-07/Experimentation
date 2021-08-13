@@ -3,7 +3,14 @@
 
 std::unordered_map<std::string, Mesh> Object::m_meshes{};
 
-Object::Object(std::string filename)
+Object::Object(Mesh mesh, std::string meshLabel, Device& device, UINT32 frameCount) : m_device(device)
+{
+	m_meshes.insert(std::make_pair(meshLabel, std::move(mesh)));
+
+	m_frameCount = frameCount;
+}
+
+Object::Object(std::string filename, Device& device, UINT32 frameCount) : m_device(device)
 {
 	auto it = m_meshes.find(filename);
 	if (it != m_meshes.end()) {
@@ -19,6 +26,16 @@ Object::Object(std::string filename)
 
 		mesh.loadMeshFromFile(filename.c_str());
 	}
+
+	m_frameCount = frameCount;
+
+	createConstantBuffer();
+}
+
+void Object::updateConstantBuffer(UINT frameIndex)
+{
+	ObjectConstantBuffer objectConstantBufferData = getObjectCB();
+	memcpy(m_pObjectCbvDataBegin + frameIndex * sizeof(objectConstantBufferData), &objectConstantBufferData, sizeof(objectConstantBufferData));
 }
 
 ObjectConstantBuffer Object::getObjectCB() const
@@ -34,4 +51,28 @@ ObjectConstantBuffer Object::getObjectCB() const
 	cb.alpha = m_alpha;
 
 	return cb;
+}
+
+void Object::createConstantBuffer()
+{
+	auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+
+	// Object Constant Buffer
+	{
+		auto objectConstantBufferResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(sizeof(ObjectConstantBuffer) * m_frameCount);
+
+		ThrowIfFailed(m_device->CreateCommittedResource(
+			&uploadHeapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&objectConstantBufferResourceDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&m_objectConstantBuffer)));
+
+		CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
+		ThrowIfFailed(m_objectConstantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_pObjectCbvDataBegin)));
+		//memcpy(m_pCbvDataBegin, &m_sceneConstantBufferData, sizeof(m_sceneConstantBufferData));
+
+		m_objectConstantBuffer->SetName(L"ObjectConstantBuffer");
+	}
 }

@@ -92,3 +92,47 @@ void ShadowMap::buildDescriptors()
 		m_hCpuDsv.Offset(m_dsvIncrementSize);
 	}
 }
+
+void ShadowMap::addPointLight()
+{
+	m_pointLights.push_back(PointLight{});
+}
+
+void ShadowMap::addPointLight(const PointLight& data)
+{
+	UINT index = m_pointLights.size();
+	addPointLight();
+	updatePointLight(data, index);
+}
+
+void ShadowMap::removePointLight()
+{
+	m_pointLights.pop_back();
+}
+
+void ShadowMap::addDirectionalLight()
+{
+	m_directionalLights.push_back(DirectionalLight{});
+}
+
+void ShadowMap::addDirectionalLight(const DirectionalLight& data)
+{
+	UINT index = m_directionalLights.size();
+	addDirectionalLight();
+	updateDirectionalLight(data, index);
+}
+
+void ShadowMap::removeDirectionalLight()
+{
+	m_directionalLights.pop_back();
+}
+
+void ShadowMap::updatePointLight(const PointLight& data, UINT32 index)
+{
+	m_pointLights[index] = data;
+}
+
+void ShadowMap::updateDirectionalLight(const DirectionalLight& data, UINT32 index)
+{
+	m_directionalLights[index] = data;
+}

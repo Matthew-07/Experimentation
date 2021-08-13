@@ -157,6 +157,96 @@ void Mesh::loadMeshFromFile(const char* filename, std::unordered_map<const char*
 	memcpy(m_indices, indices.data(), sizeof(UINT32) * indices.size());
 }
 
+void Mesh::initAsGrid(UINT width, UINT height, float horizontalSpacing, float verticalSpacing, float horizontalOffset, float verticalOffset)
+{
+	m_numberOfVertices = width * height;
+	m_numberOfIndices = (width - 1) * (height - 1) * 6;
+
+	m_vertices = new char[m_vertexSize * m_numberOfVertices];
+	m_indices = new UINT32[m_numberOfIndices];
+
+	ElementDescriptor *positionDescriptor = nullptr, *normalDescriptor = nullptr, *textureDescriptor = nullptr;
+	for (UINT i = 0; i < m_numberOfDescriptors; ++i) {
+		if (m_elementDescriptors[i].label == "position") {
+			positionDescriptor = m_elementDescriptors + i;
+		}
+		else if(m_elementDescriptors[i].label == "normal"){
+			normalDescriptor = m_elementDescriptors + i;
+		}
+		else if (m_elementDescriptors[i].label == "texture") {
+			textureDescriptor = m_elementDescriptors + i;
+		}
+	}
+
+	for (UINT32 x = 0; x < width; ++x) {
+		for (UINT32 y = 0; y < width; ++y) {
+			if (positionDescriptor != nullptr) {
+				UINT offset = 0;
+				char* data = new char[4 * getDataSize(positionDescriptor->type)];
+				convertData(positionDescriptor->type, x * horizontalSpacing - horizontalOffset, data + offset);
+				offset += getDataSize(positionDescriptor->type);
+				convertData(positionDescriptor->type, y * verticalSpacing - verticalOffset, data + offset);
+				offset += getDataSize(positionDescriptor->type);
+				convertData(positionDescriptor->type, 0.f, data + offset);
+				offset += getDataSize(positionDescriptor->type);
+				convertData(positionDescriptor->type, 1.f, data + offset);
+
+				memcpy(m_vertices + m_vertexSize * (x + y * width) + positionDescriptor->offset,
+					data, positionDescriptor->size * getDataSize(positionDescriptor->type));
+
+				delete[] data;
+			}
+
+			if (normalDescriptor != nullptr) {
+				UINT offset = 0;
+				char* data = new char[4 * getDataSize(normalDescriptor->type)];
+				convertData(normalDescriptor->type, 0.f, data + offset);
+				offset += getDataSize(normalDescriptor->type);
+				convertData(normalDescriptor->type, 0.f, data + offset);
+				offset += getDataSize(normalDescriptor->type);
+				convertData(normalDescriptor->type, 1.f, data + offset);
+				offset += getDataSize(normalDescriptor->type);
+				convertData(normalDescriptor->type, 0.f, data + offset);
+
+				memcpy(m_vertices + m_vertexSize * (x + y * width) + normalDescriptor->offset,
+					data, normalDescriptor->size * getDataSize(normalDescriptor->type));
+
+				delete[] data;
+			}
+
+			if (textureDescriptor != nullptr) {
+				UINT offset = 0;
+				char* data = new char[2 * getDataSize(textureDescriptor->type)];
+				convertData(textureDescriptor->type, (double) x / width, data + offset);
+				offset += getDataSize(textureDescriptor->type);
+				convertData(textureDescriptor->type, (double) y / height, data + offset);
+
+				memcpy(m_vertices + m_vertexSize * (x + y * width) + textureDescriptor->offset,
+					data, textureDescriptor->size * getDataSize(textureDescriptor->type));
+
+				delete[] data;
+			}
+		}
+	}
+
+	UINT32 index = 0;
+	for (UINT32 x = 0; x < width - 1; ++x) {
+		for (UINT32 y = 0; y < height - 1; ++y) {
+			// Top left triangle
+			m_indices[index] = x + width * y;
+			m_indices[index + 1] = x + width * (y + 1);
+			m_indices[index + 2] = (x + 1) + width * y;
+
+			// Bottom right triangle
+			m_indices[index + 3] = (x + 1) + width * y;
+			m_indices[index + 4] = x + width * (y + 1);
+			m_indices[index + 5] = (x + 1) + width * (y + 1);
+
+			index += 6;
+		}
+	}
+}
+
 void Mesh::scheduleUpload(ComPtr<ID3D12Device> m_device, ComPtr<ID3D12GraphicsCommandList> m_commandList) {
 	// Create the vertex buffer.
 	auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);

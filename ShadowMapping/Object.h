@@ -1,15 +1,18 @@
 #pragma once
 
 #include "Mesh.h"
+#include "Device.h"
 
 using namespace DirectX;
 
 struct ObjectConstantBuffer {
-	XMMATRIX model_matrix{};
-	XMMATRIX normal_matrix{};
+	XMMATRIX model_matrix{}; // 16
+	XMMATRIX normal_matrix{}; // 16
 
-	float k_s = 0.f;
-	float alpha = 0.f;
+	float k_s = 0.f; // 1
+	float alpha = 0.f; // 1
+
+	float padding[64 - 16 - 16 - 1 - 1];
 };
 
 using namespace DirectX;
@@ -17,9 +20,27 @@ using namespace DirectX;
 class Object
 {
 public:
-	Object(std::string mesh);
+	Object(Mesh mesh, std::string meshLabel, Device& device, UINT32 frameCount);
+	Object(std::string mesh, Device& device, UINT32 frameCount);
+
+	void updateConstantBuffer(UINT frameIndex);
+
+	void setPosition(XMVECTOR position) { m_position = position; }
+	void setScaling(XMVECTOR scaling) { m_scaling = scaling; }
+	void setQuaternion(XMVECTOR quaternion) { m_quaternion = quaternion; }
+
+	XMVECTOR getPosition() { return m_position; }
+	XMVECTOR getScaling() { return m_scaling; }
+	XMVECTOR getQuaternion() { return m_quaternion; }
+
+	void translate(XMVECTOR offset) { m_position += offset; }
+	void scale(XMVECTOR ratios) { m_scaling *= ratios; }
+	void rotate(XMVECTOR quaternion) { m_quaternion = XMQuaternionMultiply(quaternion, m_quaternion); }
 
 private:
+	Device& m_device;
+	UINT m_frameCount = 2;
+
 	Mesh* m_mesh;
 
 	static std::unordered_map<std::string, Mesh> m_meshes;
@@ -32,9 +53,10 @@ private:
 	float m_alpha = 10.f;
 
 	ComPtr<ID3D12Resource> m_objectConstantBuffer;
-	ObjectConstantBuffer m_objectConstantBufferData;
 	UINT8* m_pObjectCbvDataBegin;
 
 	ObjectConstantBuffer getObjectCB() const;
+
+	void createConstantBuffer();
 };
 

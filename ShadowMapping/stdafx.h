@@ -30,6 +30,7 @@
 #pragma comment(lib, "d3dcompiler")
 
 // std data structures
+#include <array>
 #include <vector>
 #include <unordered_map>
 #include <list>

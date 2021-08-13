@@ -1,11 +1,13 @@
 // Textures
-texture2D diffuseTexture : register(t0);
-texture2D shadowMaps[3] : register(t1);
-TextureCube shadowCubeMaps[3] : register(t4);
+texture2D postTexture : register(t0);
+texture2D diffuseTexture : register(t1);
+texture2D shadowMaps[3] : register(t2);
+TextureCube shadowCubeMaps[3] : register(t5);
 
 // Samplers
-SamplerState diffuseSampler : register(s0);
-SamplerComparisonState shadowSampler : register(s1);
+SamplerState postSampler : register(s0);
+SamplerState diffuseSampler : register(s1);
+SamplerComparisonState shadowSampler : register(s2);
 
 struct VSInput
 {
@@ -21,6 +23,16 @@ struct PSInput
     float3 worldPosition : POSITION3;
     float3 normal : NORMAL;
     float2 tex : TEXCOORD0;
+};
+
+struct PostVSInput {
+    float3 position : POSITION;
+    float2 tex : TEXCOORD;
+};
+
+struct PostPSInput {
+    float4 position : SV_POSITION;
+    float2 tex : TEXCOORD;
 };
 
 struct DirectionalLight

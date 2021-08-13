@@ -37,6 +37,7 @@ public:
 class Mesh
 {
 public:
+	Mesh() {}
 	Mesh(ElementDescriptor* descriptors, UINT32 numDescriptors) {		
 		m_numberOfDescriptors = numDescriptors;
 		m_elementDescriptors = new ElementDescriptor[numDescriptors];
@@ -72,10 +73,21 @@ public:
 		unload();
 	}
 
+	Mesh(Mesh&& obj) {
+		m_numberOfVertices = obj.m_numberOfVertices;
+		m_vertices = obj.m_vertices;
+
+		m_numberOfIndices = obj.m_numberOfIndices;
+		m_indices = obj.m_indices;
+
+		obj.m_vertices = nullptr;
+		obj.m_indices = nullptr;		
+	}
+
 	void unload() {
-		delete[] m_elementDescriptors;
-		delete[] m_vertices;
-		delete[] m_indices;
+		if (m_elementDescriptors != nullptr) { delete[] m_elementDescriptors; m_elementDescriptors = nullptr; }
+		if (m_vertices != nullptr) { delete[] m_vertices; m_vertices = nullptr; }
+		if (m_indices != nullptr) { delete[] m_indices; m_indices = nullptr; }
 
 		m_vertexBuffer.Reset();
 		m_indexBuffer.Reset();
@@ -87,6 +99,9 @@ public:
 	void loadMeshFromFile(const char* filename);
 	void loadMeshFromFile(const char* filename, std::unordered_map<const char*, const char*> relabelling);
 
+	void initAsGrid(UINT width=2, UINT height=2, float horizontalSpacing=1.f, float verticalSpacing=1.f,
+		float horizontalOffset=0.f, float verticalOffset=0.f);
+
 	void scheduleUpload(ComPtr<ID3D12Device> device, ComPtr<ID3D12GraphicsCommandList> commandList);
 	void finaliseUpload() {
 		vertexBufferUploadHeap.Reset();
@@ -94,14 +109,14 @@ public:
 	}
 
 private:
-	char* m_vertices;
+	char* m_vertices = nullptr;
 	UINT32 m_numberOfVertices;
 	UINT32 m_vertexSize;
 
-	ElementDescriptor* m_elementDescriptors;
+	ElementDescriptor* m_elementDescriptors = nullptr;
 	UINT32 m_numberOfDescriptors;
 
-	UINT32* m_indices;
+	UINT32* m_indices = nullptr;
 	UINT32 m_numberOfIndices;
 
 	ComPtr<ID3D12Resource> m_vertexBuffer;
@@ -148,6 +163,33 @@ private:
 			return 1;
 		default:
 			return 0;
+		}
+	}
+	
+	void convertData(const DescriptorDataType type, double data, void* destination) {
+		switch (type) {
+		case _FLOAT64:
+			*(double*)destination = data; break;
+		case _FLOAT32:
+			*(float*)destination = (float)data; break;
+
+		case _INT64:
+			*(INT64*)destination = (INT64)data; break;
+		case _INT32:
+			*(INT32*)destination = (INT32)data; break;
+		case _INT16:
+			*(INT32*)destination = (INT32)data; break;
+		case _INT8:
+			*(INT32*)destination = (INT32)data; break;
+
+		case _UINT64:
+			*(UINT64*)destination = (UINT64)data; break;
+		case _UINT32:
+			*(UINT32*)destination = (UINT32)data; break;
+		case _UINT16:
+			*(UINT32*)destination = (UINT32)data; break;
+		case _UINT8:
+			*(UINT32*)destination = (UINT32)data; break;
 		}
 	}
 };
