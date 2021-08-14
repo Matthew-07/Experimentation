@@ -64,9 +64,9 @@ void Object::draw(ComPtr<ID3D12GraphicsCommandList> m_commandList, UINT rootPara
 ObjectConstantBuffer Object::getObjectCB() const
 {
 	ObjectConstantBuffer cb{};
-	cb.model_matrix = XMMatrixTranslationFromVector(m_position) *
+	cb.model_matrix = XMMatrixScalingFromVector(m_scaling) *		
 		XMMatrixRotationQuaternion(m_quaternion) *
-		XMMatrixScalingFromVector(m_scaling);
+		XMMatrixTranslationFromVector(m_position);
 
 	cb.normal_matrix = XMMatrixTranspose(XMMatrixInverse(nullptr, cb.model_matrix));
 

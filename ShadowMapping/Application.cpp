@@ -48,6 +48,8 @@ void Application::run()
 {
     MSG msg{};
 
+    lastUpdate = std::chrono::steady_clock::now();
+
     while (true)
     {
         if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
@@ -267,7 +269,7 @@ void Application::createDescriptorHeaps()
 
     // Describe and create a depth stencil view (DSV) descriptor heap.
     D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
-    dsvHeapDesc.NumDescriptors = 1 + m_shadowMap.getDescriptorCount();
+    dsvHeapDesc.NumDescriptors = 1 + m_shadowMap.getDsvDescriptorCount();
     dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
     dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
     ThrowIfFailed(m_device->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&m_dsvHeap)));    
@@ -276,16 +278,25 @@ void Application::createDescriptorHeaps()
     // Describe and create a shader resource view (SRV) and constant 
         // buffer view (CBV) descriptor heap.
     D3D12_DESCRIPTOR_HEAP_DESC cbvSrvHeapDesc = {};
-    cbvSrvHeapDesc.NumDescriptors = 2 + m_shadowMap.getDescriptorCount(); // One srv to use for texturing and one for the post shaders plus srvs for shadow mapping
+    cbvSrvHeapDesc.NumDescriptors = 2 + m_shadowMap.getSrvDescriptorCount(); // One srv to use for texturing and one for the post shaders plus srvs for shadow mapping
     cbvSrvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     cbvSrvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     ThrowIfFailed(m_device->CreateDescriptorHeap(&cbvSrvHeapDesc, IID_PPV_ARGS(&m_cbvSrvHeap)));
     NAME_D3D12_OBJECT(m_cbvSrvHeap);
     m_cbvSrvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+    m_shadowMap.buildDescriptors(m_cbvSrvDescriptorSize, m_dsvDescriptorSize,
+        CD3DX12_CPU_DESCRIPTOR_HANDLE{ m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), 2, m_cbvSrvDescriptorSize },
+        CD3DX12_GPU_DESCRIPTOR_HANDLE{ m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 2, m_cbvSrvDescriptorSize },
+        CD3DX12_CPU_DESCRIPTOR_HANDLE{ m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), 1, m_dsvDescriptorSize });
 }
 
 void Application::createScene()
 {
+    XMVECTOR cameraPosition = XMVectorSet(5.f, 0.f, 1.f, 1.f);
+    m_camera.init(cameraPosition, -cameraPosition, XMVectorSet(0.f, 0.f, 1.f, 0.f), XMConvertToRadians(70.f),
+        (float) m_windowWidth / m_windowHeight, 0.1f, 100.f);
+
     m_rectangle.initAsGrid(2, 2, 2.f, 2.f, -1.f, -1.f);
 
     Object monkey("monkey.mesh", m_device, FrameCount);
@@ -294,25 +305,60 @@ void Application::createScene()
     monkey.setQuaternion(XMQuaternionIdentity());
     m_sceneObjects.push_back(monkey);
 
+    Object monkey2("monkey.mesh", m_device, FrameCount);
+    monkey2.setPosition(XMVectorSet(-2.f, 2.f, 0.f, 0.f));
+    monkey2.setScaling(XMVectorSet(1.f, 1.f, 1.f, 1.f));
+    monkey2.setQuaternion(XMQuaternionIdentity());
+    m_sceneObjects.push_back(monkey2);
+
+    Object monkey3("monkey.mesh", m_device, FrameCount);
+    monkey3.setPosition(XMVectorSet(-2.f, -2.f, 0.f, 0.f));
+    monkey3.setScaling(XMVectorSet(1.f, 1.f, 1.f, 1.f));
+    monkey3.setQuaternion(XMQuaternionIdentity());
+    m_sceneObjects.push_back(monkey3);
+
+    Object monkey4("monkey.mesh", m_device, FrameCount);
+    monkey4.setPosition(XMVectorSet(-4.f, 0.f, 0.f, 0.f));
+    monkey4.setScaling(XMVectorSet(1.f, 1.f, 1.f, 1.f));
+    monkey4.setQuaternion(XMQuaternionIdentity());
+    m_sceneObjects.push_back(monkey4);
+
+    Object monkey5("monkey.mesh", m_device, FrameCount);
+    monkey5.setPosition(XMVectorSet(-4.f, -4.f, 0.f, 0.f));
+    monkey5.setScaling(XMVectorSet(1.f, 1.f, 1.f, 1.f));
+    monkey5.setQuaternion(XMQuaternionIdentity());
+    m_sceneObjects.push_back(monkey5);
+
+    Object monkey6("monkey.mesh", m_device, FrameCount);
+    monkey6.setPosition(XMVectorSet(-4.f, 4.f, 0.f, 0.f));
+    monkey6.setScaling(XMVectorSet(1.f, 1.f, 1.f, 1.f));
+    monkey6.setQuaternion(XMQuaternionIdentity());
+    m_sceneObjects.push_back(monkey6);
+
     ElementDescriptor descriptors[3] = {
             { "position", _FLOAT32, 3, 0 },
             { "normal", _FLOAT32, 3, 12 },
             { "tex", _FLOAT32, 2, 24 }
     };
     Mesh planeMesh{ descriptors, 3 };
-    planeMesh.initAsGrid(2, 2, 10.f, 10.f);
+    planeMesh.initAsGrid(2, 2, 20.f, 20.f, -10.f, -10.f);
 
     Object plane(std::move(planeMesh), "plane", m_device, FrameCount);
-    plane.setPosition(XMVectorSet(-5.f, -5.f, -1.f, 1.f));
+    plane.setPosition(XMVectorSet(0.f, 0.f, -1.f, 1.f));
+    //plane.setScaling(XMVectorSet(-1.f, 1.f, 1.f, 1.f));
     plane.setScaling(XMVectorSet(-1.f, 1.f, 1.f, 1.f));
     plane.setQuaternion(XMQuaternionIdentity());
     m_sceneObjects.push_back(plane);
 
+    m_shadowMap.init(m_device.getDevice().Get(), FrameCount);
+
     PointLight p;
     p.color = { 1.f, 1.f, 1.f };
-    p.intensity = 4.f;
-    p.position = { 2.f, 1.f, 1.5f };
+    p.intensity = 20.f;
+    p.position = { 2.f, 2.f, 3.f };
     m_shadowMap.addPointLight(p);
+
+    m_shadowMap.buildResources();
 }
 
 std::array<const CD3DX12_STATIC_SAMPLER_DESC, 2> Application::createStaticSamplers()
@@ -487,10 +533,11 @@ void Application::createPipelineState()
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowsPsoDesc = basicPsoDesc;
     shadowsPsoDesc.pRootSignature = m_sceneRootSignature.Get();
-    basicPsoDesc.VS = CD3DX12_SHADER_BYTECODE(shadowsVS.Get());
-    //basicPsoDesc.PS = D3D12_SHADER_BYTECODE(shadowsPS.Get());
-    basicPsoDesc.PS = CD3DX12_SHADER_BYTECODE{};
-    shadowsPsoDesc.RasterizerState.DepthBias = 100000;
+    shadowsPsoDesc.VS = CD3DX12_SHADER_BYTECODE(shadowsVS.Get());
+    shadowsPsoDesc.PS.BytecodeLength = 0;
+    shadowsPsoDesc.PS.pShaderBytecode = nullptr;
+    //shadowsPsoDesc.RasterizerState.DepthBias =   100000;
+    shadowsPsoDesc.RasterizerState.DepthBias = 100;
     shadowsPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
     shadowsPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
     // Shadow map pass does not have a render target.
@@ -721,27 +768,42 @@ void Application::update() {
         }
     }
 
-    ZeroMemory(&m_sceneConstantBufferData, sizeof(m_sceneConstantBufferData));
+    auto timeNow = std::chrono::steady_clock::now();
 
-    PointLight p;
-    p.color = { 1.f, 1.f, 1.f };
-    p.intensity = 4.f;
-    p.position = { 2.f, 1.f, 1.5f };    
+    float timeElapsed = std::chrono::duration_cast<std::chrono::microseconds>(timeNow - lastUpdate).count();
+    lastUpdate = timeNow;
 
-    m_sceneConstantBufferData.number_of_lights = 1;
-    m_sceneConstantBufferData.point_lights[0] = p;
+    float distance = 0.000005f * timeElapsed;
+
+    if (key_left || key_a) m_camera.left(distance);
+    if (key_right || key_d) m_camera.right(distance);
+    if (key_up || key_w) m_camera.forward(distance);
+    if (key_down || key_s) m_camera.backward(distance);
+    if (key_space) m_camera.up(distance);
+    if (key_shift) m_camera.down(distance);
+
+    ZeroMemory(&m_sceneConstantBufferData, sizeof(m_sceneConstantBufferData));  
+
+    m_sceneConstantBufferData.number_of_lights = m_shadowMap.getNumberOfPointLights();
+    for (int i = 0; i < m_shadowMap.getNumberOfPointLights(); ++i) {
+        m_sceneConstantBufferData.point_lights[i] = m_shadowMap.getPointLight(i);
+    }
     m_sceneConstantBufferData.ambient.color = { 1.f, 1.f, 1.f };
     m_sceneConstantBufferData.ambient.intensity = 0.1f;
-    m_sceneConstantBufferData.view_proj_matrix = 
-        XMMatrixLookAtLH(XMVectorSet(5.f, 2.f, 1.f, 1.f), XMVectorZero(), XMVectorSet(0.f, 0.f, 1.f, 0.f)) *
-        XMMatrixPerspectiveFovLH(XMConvertToRadians(70.f), m_windowWidth / m_windowHeight, 0.1f, 100.f);
-    m_sceneConstantBufferData.camera_position = { 5.f, 2.f, 1.f };
+    //m_sceneConstantBufferData.view_proj_matrix = 
+    //    XMMatrixLookAtLH(XMVectorSet(5.f, 0.f, 1.f, 1.f), XMVectorZero(), XMVectorSet(0.f, 0.f, 1.f, 0.f)) *
+    //    XMMatrixPerspectiveFovLH(XMConvertToRadians(70.f), m_windowWidth / m_windowHeight, 0.1f, 100.f);
+    //m_sceneConstantBufferData.camera_position = { 5.f, 0.f, 1.f };
+    m_sceneConstantBufferData.view_proj_matrix = m_camera.getViewMatrix() * m_camera.getProjMatrix();
+    XMStoreFloat3(&m_sceneConstantBufferData.camera_position, m_camera.getPosition());
 
     memcpy(m_pSceneCbvDataBegin + m_frameIndex * sizeof(m_sceneConstantBufferData), &m_sceneConstantBufferData, sizeof(m_sceneConstantBufferData));
 
     for (auto& object : m_sceneObjects) {
         object.updateConstantBuffer(m_frameIndex);
     }
+
+    m_shadowMap.updateConstantBuffers(m_frameIndex);
 }
 
 void Application::render() {
@@ -780,7 +842,7 @@ void Application::populateCommandLists() {
     // However, when ExecuteCommandList() is called on a particular command 
     // list, that command list can then be reset at any time and must be before 
     // re-recording.
-    ThrowIfFailed(m_sceneCommandList->Reset(m_sceneCommandAllocators[m_frameIndex].Get(), m_basicPipelineState.Get()));
+    ThrowIfFailed(m_sceneCommandList->Reset(m_sceneCommandAllocators[m_frameIndex].Get(), m_shadowsPipelineState.Get()));
     ThrowIfFailed(m_postCommandList->Reset(m_postCommandAllocators[m_frameIndex].Get(), m_postPipelineState.Get()));
 
     m_sceneCommandList->SetGraphicsRootSignature(m_sceneRootSignature.Get());
@@ -789,24 +851,61 @@ void Application::populateCommandLists() {
     ID3D12DescriptorHeap* ppHeaps[] = { m_cbvSrvHeap.Get() };
     m_sceneCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
-    m_sceneCommandList->SetGraphicsRootConstantBufferView(RootSceneConstantBuffer, m_sceneConstantBuffer->GetGPUVirtualAddress() + m_frameIndex * sizeof(SceneConstantBuffer));
-
     // Shadow passes
     {
+        PIXBeginEvent(m_sceneCommandList.Get(), 0, "Shadow Pass");
 
+        //m_sceneCommandList->SetPipelineState(m_shadowsPipelineState.Get());
+
+        m_sceneCommandList->RSSetViewports(1, m_shadowMap.getViewport());
+        m_sceneCommandList->RSSetScissorRects(1, m_shadowMap.getScissorRect());
+
+        CD3DX12_CPU_DESCRIPTOR_HANDLE m_dsvHandle = m_shadowMap.DSVShadowCubeMaps();
+
+        m_shadowMap.transitionWrite(m_sceneCommandList);
+
+        // Point Lights
+        for (UINT i = 0; i < m_shadowMap.getNumberOfPointLights(); ++i) {
+            for (UINT j = 0; j < 6; ++j) {
+                m_sceneCommandList->ClearDepthStencilView(m_dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
+
+                m_shadowMap.setPointConstantBuffer(m_sceneCommandList, RootSceneConstantBuffer, m_frameIndex, i, j);
+                m_sceneCommandList->OMSetRenderTargets(0, nullptr, FALSE, &m_dsvHandle);
+                
+                for (auto& object : m_sceneObjects) {
+                    object.draw(m_sceneCommandList, RootObjectConstantBuffer, m_frameIndex);
+                }
+
+                m_dsvHandle.Offset(m_dsvDescriptorSize);
+            }
+        }
+
+
+        PIXEndEvent(m_sceneCommandList.Get());
     }
 
     // Main pass
     {
         PIXBeginEvent(m_sceneCommandList.Get(), 0, "Main Pass");
 
+        m_sceneCommandList->SetGraphicsRootConstantBufferView(RootSceneConstantBuffer, m_sceneConstantBuffer->GetGPUVirtualAddress() + m_frameIndex * sizeof(SceneConstantBuffer));
+
         m_sceneCommandList->SetPipelineState(m_basicPipelineState.Get());
 
         m_sceneCommandList->RSSetViewports(1, &m_sceneViewport);
         m_sceneCommandList->RSSetScissorRects(1, &m_sceneScissorRect);
 
+        m_shadowMap.transitionRead(m_sceneCommandList);
+
+        // Bind texture
         CD3DX12_GPU_DESCRIPTOR_HANDLE texHandle{ m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 1, m_cbvSrvDescriptorSize };
         m_sceneCommandList->SetGraphicsRootDescriptorTable(RootTextureTable, texHandle);
+
+        // Bind shadow maps
+        if (m_shadowMap.getNumberOfDirectionalLights() > 0)
+            m_sceneCommandList->SetGraphicsRootDescriptorTable(RootSceneShadowMapTable, m_shadowMap.SRVShadowMaps());
+        if (m_shadowMap.getNumberOfPointLights() > 0)
+            m_sceneCommandList->SetGraphicsRootDescriptorTable(RootSceneShadowCubeMapTable, m_shadowMap.SRVShadowCubeMaps());
 
         // Bind render target and depth buffer
         CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), FrameCount, m_rtvDescriptorSize);
@@ -882,6 +981,133 @@ void Application::populateCommandLists() {
 
 LRESULT Application::handleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
+    switch (msg) {
+    case WM_CREATE:
+    {
+        POINT center;
+        center.x = m_width / 2;
+        center.y = m_height / 2;
+
+        ClientToScreen(m_hwnd, &center);
+
+        SetCursorPos(center.x, center.y);
+
+        ShowCursor(false);
+
+        break;
+    }
+    case WM_DESTROY:
+    {
+        PostQuitMessage(0);
+        break;
+    }
+    case WM_MOUSEMOVE:
+    {
+        float xPos = GET_X_LPARAM(lParam);
+        float yPos = GET_Y_LPARAM(lParam);
+
+        //if (mousePosInit) {
+        //    m_camera.pitch((yPos - mouse_y) * 0.005f);
+        //    m_camera.yawRight((xPos - mouse_x) * 0.005f);
+        //}
+
+        //mouse_x = xPos;
+        //mouse_y = yPos;
+        //mousePosInit = true;
+
+        float dx = xPos - (m_width / 2.f);
+        float dy = yPos - (m_height / 2.f);
+
+        m_camera.yawRight(dx * 0.004f);
+        m_camera.pitch(dy * 0.004f);
+
+        POINT center;
+        center.x = m_width / 2;
+        center.y = m_height / 2;
+
+        ClientToScreen(m_hwnd, &center);
+
+        SetCursorPos(center.x, center.y);
+
+        break;
+    }
+    case WM_KEYDOWN:
+    {
+        switch (wParam) {
+        case VK_LEFT:
+            key_left = true;
+            break;
+        case VK_RIGHT:
+            key_right = true;
+            break;
+        case VK_UP:
+            key_up = true;
+            break;
+        case VK_DOWN:
+            key_down = true;
+            break;
+
+        case 0x41: // A
+            key_a = true;
+            break;
+        case 0x44: // D
+            key_d = true;
+            break;
+        case 0x53: // S
+            key_s = true;
+            break;
+        case 0x57: // W
+            key_w = true;
+            break;
+
+        case VK_SPACE:
+            key_space = true;
+            break;
+        case VK_SHIFT:
+            key_shift = true;
+            break;
+        }
+        break;
+    }
+    case WM_KEYUP:
+    {
+        switch (wParam) {
+        case VK_LEFT:
+            key_left = false;
+            break;
+        case VK_RIGHT:
+            key_right = false;
+            break;
+        case VK_UP:
+            key_up = false;
+            break;
+        case VK_DOWN:
+            key_down = false;
+            break;
+
+        case 0x41: // A
+            key_a = false;
+            break;
+        case 0x44: // D
+            key_d = false;
+            break;
+        case 0x53: // S
+            key_s = false;
+            break;
+        case 0x57: // W
+            key_w = false;
+            break;
+
+        case VK_SPACE:
+            key_space = false;
+            break;
+        case VK_SHIFT:
+            key_shift = false;
+            break;
+        }
+        break;
+    }
+    }
     return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 

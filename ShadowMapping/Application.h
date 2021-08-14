@@ -4,6 +4,7 @@
 #include "Device.h"
 #include "Object.h"
 #include "ShadowMap.h"
+#include "Camera.h"
 
 struct PostVertex
 {
@@ -92,6 +93,7 @@ private:
 	UINT m_dsvDescriptorSize;
 	UINT m_cbvSrvDescriptorSize;
 
+	Camera m_camera;
 	std::vector<Object> m_sceneObjects;
 	ShadowMap m_shadowMap;
 	ComPtr<ID3D12Resource> m_texture;
@@ -108,6 +110,12 @@ private:
 	ComPtr<ID3D12Fence> m_fence;
 	UINT64 m_fenceValues[FrameCount];
 	UINT64 m_fenceValue;
+
+	bool key_left = false, key_right = false, key_up = false, key_down = false;
+	bool key_a = false, key_d = false, key_w = false, key_s = false;
+	bool key_space = false, key_shift = false;
+
+	std::chrono::steady_clock::time_point lastUpdate;
 
 	void updatePostViewAndScissor();
 	void createWindowSizeDependentResources();

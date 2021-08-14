@@ -14,8 +14,8 @@ float4 main(PSInput pin) : SV_TARGET
 		//float shadowFactor = CalculateShadowFactor(pin.shadowPos[i], i);
 
 		float3 lightDirection = point_lights[i].worldPosition - pin.worldPosition;
-		//float shadowFactor = CalculateShadowFactorCube(lightDirection, i);
-		float shadowFactor = 1.f;
+		float shadowFactor = CalculateShadowFactorCube(-lightDirection, i);
+		//float shadowFactor = 1.f;
 
 		if (shadowFactor > 0.f) {
 			// Compute vectors

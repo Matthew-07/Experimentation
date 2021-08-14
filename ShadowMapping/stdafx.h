@@ -43,6 +43,7 @@
 #include <exception>
 #include <fstream>
 #include <sstream>
+#include <chrono>
 
 inline std::string HrToString(HRESULT hr)
 {

@@ -40,7 +40,10 @@ struct DirectionalLight
 {
     float4x4 shadowTransformation;
     float3 direction;
+    float width;
     float3 color;
+    float height;
+    float3 position;
     float intensity;
 };
 
@@ -94,7 +97,12 @@ float CalculateShadowFactor(float4 shadowPos, uint shadowMapIndex=0) {
 float CalculateShadowFactorCube(float3 positionVector, uint shadowMapIndex = 0) {
     //shadowpos.xyz /= shadowpos.w;
 
-    float depth = length(positionVector);
+    //float depth = 1.f / ((length(positionVector) - 0.1f) / 99.9f);
+    //float depth = 1.f - (1.f / length(positionVector) / 10.f);
+    //float depth = 1.f - ((1.f / length(positionVector)) - 0.1f) / 9.9f;
+
+    float depth = max(max(abs(positionVector.x), abs(positionVector.y)), abs(positionVector.z));
+    depth = 1.f - 1.f / depth / 10.f;
 
     //initally, only sample one point in the shadow map (so the function will return 0.f or 1,f)
     float percentlit = 0.f;
