@@ -1,5 +1,6 @@
 // Textures
-texture2D postTexture : register(t0);
+//texture2D postTexture : register(t0);
+Texture2DMS<float4> postTexture : register(t0);
 texture2D diffuseTexture : register(t1);
 texture2D shadowMaps[3] : register(t2);
 TextureCube shadowCubeMaps[3] : register(t5);

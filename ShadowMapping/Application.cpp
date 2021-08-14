@@ -152,8 +152,10 @@ void Application::createResolutionDependentResources()
             m_width,
             m_height,
             1u, 1u,
-            swapChainDesc.SampleDesc.Count,
-            swapChainDesc.SampleDesc.Quality,
+            //swapChainDesc.SampleDesc.Count,
+            4,
+            //swapChainDesc.SampleDesc.Quality,
+            0,
             D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
             D3D12_TEXTURE_LAYOUT_UNKNOWN, 0u);
 
@@ -170,13 +172,19 @@ void Application::createResolutionDependentResources()
     }
 
     // Create SRV for the intermediate render target.
-    m_device->CreateShaderResourceView(m_intermediateRenderTarget.Get(), nullptr, m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart());
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = m_renderTargets[m_frameIndex]->GetDesc().Format;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DMS;
+    /*m_device->CreateShaderResourceView(m_intermediateRenderTarget.Get(), nullptr, m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart());*/
+    m_device->CreateShaderResourceView(m_intermediateRenderTarget.Get(), &srvDesc, m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart());
 
     // Create the depth stencil view.
     {
         D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilDesc = {};
         depthStencilDesc.Format = DXGI_FORMAT_D32_FLOAT;
-        depthStencilDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+        //depthStencilDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+        depthStencilDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2DMS;
         depthStencilDesc.Flags = D3D12_DSV_FLAG_NONE;
 
         D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
@@ -184,7 +192,8 @@ void Application::createResolutionDependentResources()
         depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
         depthOptimizedClearValue.DepthStencil.Stencil = 0;
 
-        auto texture2DResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, m_width, m_height, 1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+        /*auto texture2DResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, m_width, m_height, 1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);*/
+        auto texture2DResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, m_width, m_height, 1, 1, 4, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
         auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
         ThrowIfFailed(m_device->CreateCommittedResource(
@@ -302,7 +311,7 @@ void Application::createScene()
     PointLight p;
     p.color = { 1.f, 1.f, 1.f };
     p.intensity = 4.f;
-    p.position = { 2.f, 1.f, 1.f };
+    p.position = { 2.f, 1.f, 1.5f };
     m_shadowMap.addPointLight(p);
 }
 
@@ -466,7 +475,8 @@ void Application::createPipelineState()
     basicPsoDesc.NumRenderTargets = 1;
     basicPsoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
     basicPsoDesc.DSVFormat = DXGI_FORMAT_D32_FLOAT;
-    basicPsoDesc.SampleDesc.Count = 1;
+    //basicPsoDesc.SampleDesc.Count = 1;
+    basicPsoDesc.SampleDesc.Count = 4;
 
     ThrowIfFailed(m_device->CreateGraphicsPipelineState(&basicPsoDesc, IID_PPV_ARGS(&m_basicPipelineState)));
 
@@ -486,6 +496,7 @@ void Application::createPipelineState()
     // Shadow map pass does not have a render target.
     shadowsPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
     shadowsPsoDesc.NumRenderTargets = 0;
+    shadowsPsoDesc.SampleDesc.Count = 1;
     ThrowIfFailed(m_device->CreateGraphicsPipelineState(&shadowsPsoDesc, IID_PPV_ARGS(&m_shadowsPipelineState)));
 
     // Define the vertex input layouts.
@@ -506,6 +517,7 @@ void Application::createPipelineState()
     postPsoDesc.PS = CD3DX12_SHADER_BYTECODE(postPS.Get());
     postPsoDesc.DepthStencilState.DepthEnable = FALSE;
     postPsoDesc.DepthStencilState.StencilEnable = FALSE;
+    postPsoDesc.SampleDesc.Count = 1;
 
     ThrowIfFailed(m_device->CreateGraphicsPipelineState(&postPsoDesc, IID_PPV_ARGS(&m_postPipelineState)));
     NAME_D3D12_OBJECT(m_postPipelineState);
@@ -713,8 +725,8 @@ void Application::update() {
 
     PointLight p;
     p.color = { 1.f, 1.f, 1.f };
-    p.intensity = 2.f;
-    p.position = { 2.f, 1.f, 1.f };    
+    p.intensity = 4.f;
+    p.position = { 2.f, 1.f, 1.5f };    
 
     m_sceneConstantBufferData.number_of_lights = 1;
     m_sceneConstantBufferData.point_lights[0] = p;
