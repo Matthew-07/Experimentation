@@ -98,10 +98,10 @@ void Application::updatePostViewAndScissor() {
         y = viewHeightRatio / viewWidthRatio;
     }
 
-    m_postViewport.TopLeftX = m_width * (1.0f - x) / 2.0f;
-    m_postViewport.TopLeftY = m_height * (1.0f - y) / 2.0f;
-    m_postViewport.Width = x * m_width;
-    m_postViewport.Height = y * m_height;
+    m_postViewport.TopLeftX = m_windowWidth * (1.0f - x) / 2.0f;
+    m_postViewport.TopLeftY = m_windowHeight * (1.0f - y) / 2.0f;
+    m_postViewport.Width = x * m_windowWidth;
+    m_postViewport.Height = y * m_windowHeight;
 
     m_postScissorRect.left = static_cast<LONG>(m_postViewport.TopLeftX);
     m_postScissorRect.right = static_cast<LONG>(m_postViewport.TopLeftX + m_postViewport.Width);
@@ -295,7 +295,7 @@ void Application::createScene()
 {
     XMVECTOR cameraPosition = XMVectorSet(5.f, 0.f, 1.f, 1.f);
     m_camera.init(cameraPosition, -cameraPosition, XMVectorSet(0.f, 0.f, 1.f, 0.f), XMConvertToRadians(70.f),
-        (float) m_windowWidth / m_windowHeight, 0.1f, 100.f);
+        (float) m_width / m_height, 0.1f, 100.f);
 
     m_rectangle.initAsGrid(2, 2, 2.f, 2.f, -1.f, -1.f);
 
@@ -754,7 +754,8 @@ ComPtr<ID3D10Blob> Application::loadBinary(std::string filename)
     return blob;
 }
 
-void Application::update() {
+void Application::waitForFrame()
+{
     // Wait for previous frame
     {
         const UINT64 lastCompletedFence = m_fence->GetCompletedValue();
@@ -767,6 +768,25 @@ void Application::update() {
             WaitForSingleObject(m_fenceEvent, INFINITE);
         }
     }
+}
+
+
+void Application::waitForGPU()
+{
+    // Schedule a Signal command in the queue.
+    //ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), m_fenceValues[m_frameIndex]));
+    ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), m_fenceValue));
+
+    // Wait until the fence has been processed.
+    ThrowIfFailed(m_fence->SetEventOnCompletion(m_fenceValue, m_fenceEvent));
+    WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
+
+    // Increment the fence value for the current frame.
+    m_fenceValue++;
+}
+
+void Application::update() {
+    waitForFrame();
 
     auto timeNow = std::chrono::steady_clock::now();
 
@@ -775,12 +795,14 @@ void Application::update() {
 
     float distance = 0.000005f * timeElapsed;
 
-    if (key_left || key_a) m_camera.left(distance);
-    if (key_right || key_d) m_camera.right(distance);
-    if (key_up || key_w) m_camera.forward(distance);
-    if (key_down || key_s) m_camera.backward(distance);
-    if (key_space) m_camera.up(distance);
-    if (key_shift) m_camera.down(distance);
+    if (!paused) {
+        if (key_left || key_a) m_camera.left(distance);
+        if (key_right || key_d) m_camera.right(distance);
+        if (key_up || key_w) m_camera.forward(distance);
+        if (key_down || key_s) m_camera.backward(distance);
+        if (key_space) m_camera.up(distance);
+        if (key_shift) m_camera.down(distance);
+    }
 
     ZeroMemory(&m_sceneConstantBufferData, sizeof(m_sceneConstantBufferData));  
 
@@ -815,21 +837,28 @@ void Application::render() {
     ID3D12CommandList* ppCommandLists[] = { m_sceneCommandList.Get(), m_postCommandList.Get() };
     m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-    // When using sync interval 0, it is recommended to always pass the tearing
-    // flag when it is supported, even when presenting in windowed mode.
-    // However, this flag cannot be used if the app is in fullscreen mode as a
-    // result of calling SetFullscreenState.
-    UINT presentFlags = (m_tearingSupport && m_windowedMode) ? DXGI_PRESENT_ALLOW_TEARING : 0;
+    //// When using sync interval 0, it is recommended to always pass the tearing
+    //// flag when it is supported, even when presenting in windowed mode.
+    //// However, this flag cannot be used if the app is in fullscreen mode as a
+    //// result of calling SetFullscreenState.
+    //UINT presentFlags = (m_tearingSupport && m_windowedMode) ? DXGI_PRESENT_ALLOW_TEARING : 0;
 
-    // Present the frame.
-    ThrowIfFailed(m_swapChain->Present(0, presentFlags));
+    //// Present the frame.
+    //ThrowIfFailed(m_swapChain->Present(0, presentFlags));   
 
-    m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+    if (m_tearingSupport && m_windowedMode) {
+        ThrowIfFailed(m_swapChain->Present(0, DXGI_PRESENT_ALLOW_TEARING));
+    }
+    else {
+        ThrowIfFailed(m_swapChain->Present(1, 0));
+    }
 
     // Signal and increment the fence value.
     m_fenceValues[m_frameIndex] = m_fenceValue;
     ThrowIfFailed(m_commandQueue->Signal(m_fence.Get(), m_fenceValue));
     m_fenceValue++;
+
+    m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 }
 
 void Application::populateCommandLists() {
@@ -879,8 +908,6 @@ void Application::populateCommandLists() {
                 m_dsvHandle.Offset(m_dsvDescriptorSize);
             }
         }
-
-
         PIXEndEvent(m_sceneCommandList.Get());
     }
 
@@ -916,12 +943,10 @@ void Application::populateCommandLists() {
         const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
         m_sceneCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
         m_sceneCommandList->ClearDepthStencilView(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
+;
         for (auto& object : m_sceneObjects) {
             object.draw(m_sceneCommandList, RootObjectConstantBuffer, m_frameIndex);
         }
-
-        //m_rectangle.draw(m_sceneCommandList);
 
         PIXEndEvent(m_sceneCommandList.Get());
     }
@@ -956,7 +981,8 @@ void Application::populateCommandLists() {
         m_postCommandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
         // Record commands.
-        m_postCommandList->ClearRenderTargetView(rtvHandle, ClearColor, 0, nullptr);
+        const float clearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+        m_postCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
         //m_postCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
         //m_postCommandList->IASetVertexBuffers(0, 1, &m_postVertexBufferView);
         
@@ -977,6 +1003,48 @@ void Application::populateCommandLists() {
     }
 
     m_postCommandList->Close();
+}
+
+void Application::onWindowSizeChange(UINT width, UINT height)
+{
+    // Determine if the swap buffers and other resources need to be resized or not.
+    //if ((width != m_width || height != m_height) && !minimized)
+    if ((width != m_windowWidth || height != m_windowHeight))
+    {
+        // Flush all current GPU commands.
+        waitForGPU();
+        //waitForFrame();
+
+        // Release the resources holding references to the swap chain (requirement of
+        // IDXGISwapChain::ResizeBuffers) and reset the frame fence values to the
+        // current fence value.
+        for (UINT n = 0; n < FrameCount; n++)
+        {
+            m_renderTargets[n].Reset();
+            m_fenceValues[n] = m_fenceValues[m_frameIndex];
+        }
+
+        // Resize the swap chain to the desired dimensions.
+        DXGI_SWAP_CHAIN_DESC desc = {};
+        m_swapChain->GetDesc(&desc);
+        ThrowIfFailed(m_swapChain->ResizeBuffers(FrameCount, width, height, desc.BufferDesc.Format, desc.Flags));
+
+        BOOL fullscreenState;
+        ThrowIfFailed(m_swapChain->GetFullscreenState(&fullscreenState, nullptr));
+        m_windowedMode = !fullscreenState;
+
+        // Reset the frame index to the current back buffer index.
+        m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+        // Update the width, height, and aspect ratio member variables.
+        //UpdateForSizeChange(width, height);
+        m_windowWidth = width;
+        m_windowHeight = height;
+
+        createWindowSizeDependentResources();
+    }
+
+    //m_windowVisible = !minimized;
 }
 
 LRESULT Application::handleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -1003,6 +1071,7 @@ LRESULT Application::handleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
     }
     case WM_MOUSEMOVE:
     {
+        if (paused) break;
         float xPos = GET_X_LPARAM(lParam);
         float yPos = GET_Y_LPARAM(lParam);
 
@@ -1066,6 +1135,25 @@ LRESULT Application::handleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
         case VK_SHIFT:
             key_shift = true;
             break;
+
+        case 0x50: // P
+            if (paused) {
+                POINT center;
+                center.x = m_width / 2;
+                center.y = m_height / 2;
+
+                ClientToScreen(m_hwnd, &center);
+
+                SetCursorPos(center.x, center.y);
+
+                ShowCursor(false);
+                paused = false;
+            }
+            else {
+                ShowCursor(true);
+                paused = true;
+            }
+            break;
         }
         break;
     }
@@ -1105,6 +1193,11 @@ LRESULT Application::handleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
             key_shift = false;
             break;
         }
+        break;
+    }
+    case WM_SIZE:
+    {
+        onWindowSizeChange(LOWORD(lParam), HIWORD(lParam));
         break;
     }
     }

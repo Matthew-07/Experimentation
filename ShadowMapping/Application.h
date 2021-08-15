@@ -115,6 +115,8 @@ private:
 	bool key_a = false, key_d = false, key_w = false, key_s = false;
 	bool key_space = false, key_shift = false;
 
+	bool paused = false; // pause key
+
 	std::chrono::steady_clock::time_point lastUpdate;
 
 	void updatePostViewAndScissor();
@@ -132,9 +134,18 @@ private:
 	void createCommandObjects();
 	void loadAssets();
 
+	// Wait for the GPU to finish with resources for the current frame index
+	void waitForFrame();
+
+	// Wait for the GPU to finsh all commands
+	void waitForGPU();
+
 	void update();
 	void render();
 	void populateCommandLists();
+
+	void onWindowSizeChange(UINT width, UINT height);
+	void onResolutionChange(UINT width, UINT height);
 
 	ComPtr<ID3D10Blob> loadBinary(std::string filename);
 };
