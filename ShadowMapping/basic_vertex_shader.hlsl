@@ -14,9 +14,9 @@ PSInput main(VSInput vin) {
 	//// temp
 	//vout.normal = mul(view_proj_matrix, float4(vin.normal, 0.f)).xyz;
 
-	//for (uint i = 0; i < number_of_lights; ++i) {
-	//	vout.shadowPos[i] = mul(point_lights[i].shadowTransform, float4(vin.position, 1.f));
-	//}
+	for (uint i = 0; i < number_of_directional_lights; ++i) {
+		vout.shadowPos[i] = mul(directional_lights[i].shadowTransformation, float4(vout.worldPosition, 1.f));
+	}
 	
 	return vout;
 }

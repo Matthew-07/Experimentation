@@ -5,6 +5,25 @@
 #include "Object.h"
 #include "ShadowMap.h"
 #include "Camera.h"
+#include "Cubemap.h"
+
+constexpr INT const_ceil(double x) {
+	INT x_int = static_cast<INT>(x);
+	if (x_int < x) {
+		return x_int + 1;
+	}
+	else {
+		return x_int;
+	}
+}
+
+constexpr UINT minimumPadding(const UINT size) {
+	return const_ceil((double)size / 64) * 64 - size;
+
+	//double ratio = (double)size / 64;
+
+	
+}
 
 struct PostVertex
 {
@@ -27,9 +46,13 @@ struct SceneConstantBuffer
 	AmbientLight ambient; // 4
 
 	PointLight point_lights[3]; // 8 * 3 = 24
-	UINT32 number_of_lights; // 1
+	UINT32 number_of_point_lights; // 1
+	float g[3];
 
-	float padding[64 - 16 - 3 - 1 - 4 - 24 - 1];
+	DirectionalLight directional_lights[3]; // 32 * 3 = 96
+	UINT32 number_of_directional_lights; // 1
+
+	float padding[minimumPadding(16 + 3 + 1 + 4 + 24 + 1 + 3 + 3 * 32 + 1)];
 };
 
 class Application : public BaseWindow<Application>
@@ -76,6 +99,7 @@ private:
 	ComPtr<ID3D12RootSignature> m_postRootSignature;
 	ComPtr<ID3D12PipelineState> m_basicPipelineState;
 	ComPtr<ID3D12PipelineState> m_shadowsPipelineState;
+	ComPtr<ID3D12PipelineState> m_environmentPipelineState;
 	ComPtr<ID3D12PipelineState> m_postPipelineState;
 
 	enum SceneRootParameters {
@@ -98,10 +122,13 @@ private:
 	ShadowMap m_shadowMap;
 	ComPtr<ID3D12Resource> m_texture;
 
+	Cubemap m_cubeMap;
+
 	ComPtr<ID3D12Resource> m_sceneConstantBuffer;
 	SceneConstantBuffer m_sceneConstantBufferData;
 	UINT8* m_pSceneCbvDataBegin;
 
+	Mesh m_cubeMesh;
 	Mesh m_rectangle;
 
 	// Synchronization objects.
@@ -117,6 +144,7 @@ private:
 
 	bool paused = false; // pause key
 
+	std::chrono::steady_clock::time_point appStart;
 	std::chrono::steady_clock::time_point lastUpdate;
 
 	void updatePostViewAndScissor();

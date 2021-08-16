@@ -8,7 +8,8 @@ Application::Application(UINT width, UINT height, UINT windowWidth, UINT windowH
         m_sceneScissorRect(0, 0, 0, 0),
         m_postViewport(0.0f, 0.0f, 0.0f, 0.0f),
         m_postScissorRect(0, 0, 0, 0),
-        m_rectangle(std::array<ElementDescriptor, 2>{ { {"position", _FLOAT32, 3, 0}, { "texture", _FLOAT32, 2, 12 }} }.data(), 2)
+        m_rectangle(std::array<ElementDescriptor, 2>{ { {"position", _FLOAT32, 3, 0}, { "texture", _FLOAT32, 2, 12 }} }.data(), 2),
+        m_cubeMesh(std::array<ElementDescriptor, 1>{ { {"position", _FLOAT32, 3, 0 } } }.data(), 1, 8 * 4)
 {
     m_width = width;
     m_height = height;
@@ -48,7 +49,8 @@ void Application::run()
 {
     MSG msg{};
 
-    lastUpdate = std::chrono::steady_clock::now();
+    appStart = std::chrono::steady_clock::now();
+    lastUpdate = appStart;
 
     while (true)
     {
@@ -195,7 +197,7 @@ void Application::createResolutionDependentResources()
         depthOptimizedClearValue.DepthStencil.Stencil = 0;
 
         /*auto texture2DResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, m_width, m_height, 1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);*/
-        auto texture2DResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, m_width, m_height, 1, 1, 4, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
+        auto texture2DResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_D32_FLOAT, m_width, m_height, 1, 1, 4, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL | D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
         auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
         ThrowIfFailed(m_device->CreateCommittedResource(
@@ -278,7 +280,7 @@ void Application::createDescriptorHeaps()
     // Describe and create a shader resource view (SRV) and constant 
         // buffer view (CBV) descriptor heap.
     D3D12_DESCRIPTOR_HEAP_DESC cbvSrvHeapDesc = {};
-    cbvSrvHeapDesc.NumDescriptors = 2 + m_shadowMap.getSrvDescriptorCount(); // One srv to use for texturing and one for the post shaders plus srvs for shadow mapping
+    cbvSrvHeapDesc.NumDescriptors = 3 + m_shadowMap.getSrvDescriptorCount(); // One srv to use for texturing, one for environment and one for the post shaders plus srvs for shadow mapping
     cbvSrvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     cbvSrvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     ThrowIfFailed(m_device->CreateDescriptorHeap(&cbvSrvHeapDesc, IID_PPV_ARGS(&m_cbvSrvHeap)));
@@ -286,53 +288,55 @@ void Application::createDescriptorHeaps()
     m_cbvSrvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
     m_shadowMap.buildDescriptors(m_cbvSrvDescriptorSize, m_dsvDescriptorSize,
-        CD3DX12_CPU_DESCRIPTOR_HANDLE{ m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), 2, m_cbvSrvDescriptorSize },
-        CD3DX12_GPU_DESCRIPTOR_HANDLE{ m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 2, m_cbvSrvDescriptorSize },
+        CD3DX12_CPU_DESCRIPTOR_HANDLE{ m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), 3, m_cbvSrvDescriptorSize },
+        CD3DX12_GPU_DESCRIPTOR_HANDLE{ m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 3, m_cbvSrvDescriptorSize },
         CD3DX12_CPU_DESCRIPTOR_HANDLE{ m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), 1, m_dsvDescriptorSize });
 }
 
 void Application::createScene()
 {
     XMVECTOR cameraPosition = XMVectorSet(5.f, 0.f, 1.f, 1.f);
-    m_camera.init(cameraPosition, -cameraPosition, XMVectorSet(0.f, 0.f, 1.f, 0.f), XMConvertToRadians(70.f),
+    m_camera.init(cameraPosition, -cameraPosition, XMVectorSet(0.f, 1.f, 0.f, 0.f), XMConvertToRadians(70.f),
         (float) m_width / m_height, 0.1f, 100.f);
 
     m_rectangle.initAsGrid(2, 2, 2.f, 2.f, -1.f, -1.f);
 
+    m_cubeMesh.initAsCube();
+
     Object monkey("monkey.mesh", m_device, FrameCount);
     monkey.setPosition(XMVectorZero());
     monkey.setScaling(XMVectorSet(1.f, 1.f, 1.f, 1.f));
-    monkey.setQuaternion(XMQuaternionIdentity());
+    monkey.setQuaternion(XMQuaternionRotationAxis(XMVectorSet(1.f, 0.f, 0.f, 0.f), XMConvertToRadians(-90.f)));
     m_sceneObjects.push_back(monkey);
 
     Object monkey2("monkey.mesh", m_device, FrameCount);
-    monkey2.setPosition(XMVectorSet(-2.f, 2.f, 0.f, 0.f));
+    monkey2.setPosition(XMVectorSet(-2.f, 0.f, 2.f, 0.f));
     monkey2.setScaling(XMVectorSet(1.f, 1.f, 1.f, 1.f));
-    monkey2.setQuaternion(XMQuaternionIdentity());
+    monkey2.setQuaternion(XMQuaternionRotationAxis(XMVectorSet(1.f, 0.f, 0.f, 0.f), XMConvertToRadians(-90.f)));
     m_sceneObjects.push_back(monkey2);
 
     Object monkey3("monkey.mesh", m_device, FrameCount);
-    monkey3.setPosition(XMVectorSet(-2.f, -2.f, 0.f, 0.f));
+    monkey3.setPosition(XMVectorSet(-2.f, 0.f, -2.f, 0.f));
     monkey3.setScaling(XMVectorSet(1.f, 1.f, 1.f, 1.f));
-    monkey3.setQuaternion(XMQuaternionIdentity());
+    monkey3.setQuaternion(XMQuaternionRotationAxis(XMVectorSet(1.f, 0.f, 0.f, 0.f), XMConvertToRadians(-90.f)));
     m_sceneObjects.push_back(monkey3);
 
     Object monkey4("monkey.mesh", m_device, FrameCount);
     monkey4.setPosition(XMVectorSet(-4.f, 0.f, 0.f, 0.f));
     monkey4.setScaling(XMVectorSet(1.f, 1.f, 1.f, 1.f));
-    monkey4.setQuaternion(XMQuaternionIdentity());
+    monkey4.setQuaternion(XMQuaternionRotationAxis(XMVectorSet(1.f, 0.f, 0.f, 0.f), XMConvertToRadians(-90.f)));
     m_sceneObjects.push_back(monkey4);
 
     Object monkey5("monkey.mesh", m_device, FrameCount);
-    monkey5.setPosition(XMVectorSet(-4.f, -4.f, 0.f, 0.f));
+    monkey5.setPosition(XMVectorSet(-4.f, 0.f, -4.f, 0.f));
     monkey5.setScaling(XMVectorSet(1.f, 1.f, 1.f, 1.f));
-    monkey5.setQuaternion(XMQuaternionIdentity());
+    monkey5.setQuaternion(XMQuaternionRotationAxis(XMVectorSet(1.f, 0.f, 0.f, 0.f), XMConvertToRadians(-90.f)));
     m_sceneObjects.push_back(monkey5);
 
     Object monkey6("monkey.mesh", m_device, FrameCount);
-    monkey6.setPosition(XMVectorSet(-4.f, 4.f, 0.f, 0.f));
+    monkey6.setPosition(XMVectorSet(-4.f, 0.f, 4.f, 0.f));
     monkey6.setScaling(XMVectorSet(1.f, 1.f, 1.f, 1.f));
-    monkey6.setQuaternion(XMQuaternionIdentity());
+    monkey6.setQuaternion(XMQuaternionRotationAxis(XMVectorSet(1.f, 0.f, 0.f, 0.f), XMConvertToRadians(-90.f)));
     m_sceneObjects.push_back(monkey6);
 
     ElementDescriptor descriptors[3] = {
@@ -344,10 +348,10 @@ void Application::createScene()
     planeMesh.initAsGrid(2, 2, 20.f, 20.f, -10.f, -10.f);
 
     Object plane(std::move(planeMesh), "plane", m_device, FrameCount);
-    plane.setPosition(XMVectorSet(0.f, 0.f, -1.f, 1.f));
+    plane.setPosition(XMVectorSet(0.f, -1.f, 0.f, 1.f));
     //plane.setScaling(XMVectorSet(-1.f, 1.f, 1.f, 1.f));
     plane.setScaling(XMVectorSet(-1.f, 1.f, 1.f, 1.f));
-    plane.setQuaternion(XMQuaternionIdentity());
+    plane.setQuaternion(XMQuaternionRotationAxis(XMVectorSet(1.f, 0.f, 0.f, 0.f), XMConvertToRadians(-90.f)));
     m_sceneObjects.push_back(plane);
 
     m_shadowMap.init(m_device.getDevice().Get(), FrameCount);
@@ -355,8 +359,24 @@ void Application::createScene()
     PointLight p;
     p.color = { 1.f, 1.f, 1.f };
     p.intensity = 20.f;
-    p.position = { 2.f, 2.f, 3.f };
+    p.position = { 2.f, 3.f, -2.f };
     m_shadowMap.addPointLight(p);
+
+    p.color = { 1.f, 0.4f, 0.f };
+    p.intensity = 10.f;
+    p.position = { -2.f, 0.5f, 0.f };
+    m_shadowMap.addPointLight(p);
+
+    DirectionalLight d;
+    d.color = { 0.f, 0.f, 1.f };
+    d.intensity = 0.3f;
+    d.position = { 2.f, 1.f, 0.f };
+    d.direction = { -2.f, -1.f, 0.f };
+    //d.upDirection = { 0.f, 1.f, 0.f };
+    XMStoreFloat3(&d.upDirection, XMVector3Cross(XMLoadFloat3(&d.direction), XMVectorSet(0.f, 0.f, 1.f, 0.f)));
+    d.width = 16.f;
+    d.height = 16.f;
+    //m_shadowMap.addDirectionalLight(d);
 
     m_shadowMap.buildResources();
 }
@@ -414,12 +434,13 @@ void Application::createRootSignatures()
         CD3DX12_DESCRIPTOR_RANGE shadowCubeMapTable;
         shadowCubeMapTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 3, 5, 0);
 
-        CD3DX12_DESCRIPTOR_RANGE textureTable;
-        textureTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0);
+        CD3DX12_DESCRIPTOR_RANGE textureTable[2];
+        textureTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0);
+        textureTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 1);
 
         CD3DX12_ROOT_PARAMETER slotRootParameter[5];
         slotRootParameter[RootObjectConstantBuffer].InitAsConstantBufferView(0, 0, D3D12_SHADER_VISIBILITY_ALL);
-        slotRootParameter[RootTextureTable].InitAsDescriptorTable(1, &textureTable, D3D12_SHADER_VISIBILITY_PIXEL);
+        slotRootParameter[RootTextureTable].InitAsDescriptorTable(2, textureTable, D3D12_SHADER_VISIBILITY_PIXEL);
         slotRootParameter[RootSceneShadowCubeMapTable].InitAsDescriptorTable(1, &shadowCubeMapTable, D3D12_SHADER_VISIBILITY_PIXEL);
         slotRootParameter[RootSceneShadowMapTable].InitAsDescriptorTable(1, &shadowMapTable, D3D12_SHADER_VISIBILITY_PIXEL);
         slotRootParameter[RootSceneConstantBuffer].InitAsConstantBufferView(1, 0, D3D12_SHADER_VISIBILITY_ALL);
@@ -530,14 +551,14 @@ void Application::createPipelineState()
     shadowsVS = loadBinary("shadows_vertex_shader.cso");
     //shadowsPS = loadBinary("shadows_pixel_shader.cso");
     
-
+    // PSO for shadow passes
     D3D12_GRAPHICS_PIPELINE_STATE_DESC shadowsPsoDesc = basicPsoDesc;
     shadowsPsoDesc.pRootSignature = m_sceneRootSignature.Get();
     shadowsPsoDesc.VS = CD3DX12_SHADER_BYTECODE(shadowsVS.Get());
     shadowsPsoDesc.PS.BytecodeLength = 0;
     shadowsPsoDesc.PS.pShaderBytecode = nullptr;
     //shadowsPsoDesc.RasterizerState.DepthBias =   100000;
-    shadowsPsoDesc.RasterizerState.DepthBias = 100;
+    shadowsPsoDesc.RasterizerState.DepthBias = 10000;
     shadowsPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
     shadowsPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
     // Shadow map pass does not have a render target.
@@ -545,6 +566,18 @@ void Application::createPipelineState()
     shadowsPsoDesc.NumRenderTargets = 0;
     shadowsPsoDesc.SampleDesc.Count = 1;
     ThrowIfFailed(m_device->CreateGraphicsPipelineState(&shadowsPsoDesc, IID_PPV_ARGS(&m_shadowsPipelineState)));
+
+    ComPtr<ID3D10Blob> environmentVS, environmentPS;
+    environmentVS = loadBinary("environment_vertex_shader.cso");
+    environmentPS = loadBinary("environment_pixel_shader.cso");
+
+    // Pso for environment
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC environmentPsoDesc = basicPsoDesc;
+    environmentPsoDesc.VS = CD3DX12_SHADER_BYTECODE(environmentVS.Get());
+    environmentPsoDesc.PS = CD3DX12_SHADER_BYTECODE(environmentPS.Get());
+    environmentPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+    environmentPsoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+    ThrowIfFailed(m_device->CreateGraphicsPipelineState(&environmentPsoDesc, IID_PPV_ARGS(&m_environmentPipelineState)));
 
     // Define the vertex input layouts.
     D3D12_INPUT_ELEMENT_DESC postInputElementDescs[] =
@@ -557,6 +590,7 @@ void Application::createPipelineState()
     postVS = loadBinary("post_vertex_shader.cso");
     postPS = loadBinary("post_pixel_shader.cso");
 
+    // Pso for post pass
     D3D12_GRAPHICS_PIPELINE_STATE_DESC postPsoDesc = basicPsoDesc;
     postPsoDesc.InputLayout = { postInputElementDescs, _countof(postInputElementDescs) };
     postPsoDesc.pRootSignature = m_postRootSignature.Get();
@@ -674,6 +708,8 @@ void Application::loadAssets() {
 
     Object::uploadMeshes(m_device.getDevice(), m_sceneCommandList);
     m_rectangle.scheduleUpload(m_device.getDevice(), m_sceneCommandList);
+    m_cubeMesh.scheduleUpload(m_device.getDevice(), m_sceneCommandList);
+    m_cubeMap.loadFromFile(L"desertCube1024.dds", m_device.getDevice(), m_sceneCommandList);
 
     // Close the command list and execute it to begin the initial GPU setup.
     ThrowIfFailed(m_sceneCommandList->Close());
@@ -727,6 +763,14 @@ void Application::loadAssets() {
 
     Object::finaliseMeshes();
     m_rectangle.finaliseUpload();
+    m_cubeMesh.finaliseUpload();
+    m_cubeMap.finaliseUpload();
+
+    {
+        CD3DX12_CPU_DESCRIPTOR_HANDLE hCpuSrv{ m_cbvSrvHeap->GetCPUDescriptorHandleForHeapStart(), 2, m_cbvSrvDescriptorSize };
+        CD3DX12_GPU_DESCRIPTOR_HANDLE hGpuSrv{ m_cbvSrvHeap->GetGPUDescriptorHandleForHeapStart(), 2, m_cbvSrvDescriptorSize };
+        m_cubeMap.createDescriptor(hCpuSrv, hGpuSrv);
+    }
 }
 
 ComPtr<ID3D10Blob> Application::loadBinary(std::string filename)
@@ -793,6 +837,8 @@ void Application::update() {
     float timeElapsed = std::chrono::duration_cast<std::chrono::microseconds>(timeNow - lastUpdate).count();
     lastUpdate = timeNow;
 
+    float timeSinceStart = std::chrono::duration_cast<std::chrono::microseconds>(timeNow - appStart).count();
+
     float distance = 0.000005f * timeElapsed;
 
     if (!paused) {
@@ -804,18 +850,32 @@ void Application::update() {
         if (key_shift) m_camera.down(distance);
     }
 
+    PointLight p;
+    p = m_shadowMap.getPointLight(0);
+    //p.position.z = (p.position.z + timeElapsed * 0.000001);
+    //if (p.position.z > 3.f) p.position.z = -3.f;
+    p.position.z = sinf(timeSinceStart / 1000000.f) * 3.f;
+    m_shadowMap.updatePointLight(p, 0);
+
     ZeroMemory(&m_sceneConstantBufferData, sizeof(m_sceneConstantBufferData));  
 
-    m_sceneConstantBufferData.number_of_lights = m_shadowMap.getNumberOfPointLights();
+    // Set point lights
+    m_sceneConstantBufferData.number_of_point_lights = m_shadowMap.getNumberOfPointLights();
     for (int i = 0; i < m_shadowMap.getNumberOfPointLights(); ++i) {
         m_sceneConstantBufferData.point_lights[i] = m_shadowMap.getPointLight(i);
     }
+
+    // Set directional lights
+    m_sceneConstantBufferData.number_of_directional_lights = m_shadowMap.getNumberOfDirectionalLights();
+    for (int i = 0; i < m_shadowMap.getNumberOfDirectionalLights(); ++i) {
+        m_sceneConstantBufferData.directional_lights[i] = m_shadowMap.getDirectionalLight(i);
+    }
+
+    // Set ambient lighting
     m_sceneConstantBufferData.ambient.color = { 1.f, 1.f, 1.f };
     m_sceneConstantBufferData.ambient.intensity = 0.1f;
-    //m_sceneConstantBufferData.view_proj_matrix = 
-    //    XMMatrixLookAtLH(XMVectorSet(5.f, 0.f, 1.f, 1.f), XMVectorZero(), XMVectorSet(0.f, 0.f, 1.f, 0.f)) *
-    //    XMMatrixPerspectiveFovLH(XMConvertToRadians(70.f), m_windowWidth / m_windowHeight, 0.1f, 100.f);
-    //m_sceneConstantBufferData.camera_position = { 5.f, 0.f, 1.f };
+
+    // Set camera data
     m_sceneConstantBufferData.view_proj_matrix = m_camera.getViewMatrix() * m_camera.getProjMatrix();
     XMStoreFloat3(&m_sceneConstantBufferData.camera_position, m_camera.getPosition());
 
@@ -889,10 +949,25 @@ void Application::populateCommandLists() {
         m_sceneCommandList->RSSetViewports(1, m_shadowMap.getViewport());
         m_sceneCommandList->RSSetScissorRects(1, m_shadowMap.getScissorRect());
 
-        CD3DX12_CPU_DESCRIPTOR_HANDLE m_dsvHandle = m_shadowMap.DSVShadowCubeMaps();
+        CD3DX12_CPU_DESCRIPTOR_HANDLE m_dsvHandle = m_shadowMap.DSVShadowMaps();
 
         m_shadowMap.transitionWrite(m_sceneCommandList);
 
+        // Directional Lights
+        for (UINT i = 0; i < m_shadowMap.getNumberOfDirectionalLights(); ++i) {
+            m_sceneCommandList->ClearDepthStencilView(m_dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
+
+            m_shadowMap.setDirectionalConstantBuffer(m_sceneCommandList, RootSceneConstantBuffer, m_frameIndex, i);
+            m_sceneCommandList->OMSetRenderTargets(0, nullptr, FALSE, &m_dsvHandle);
+
+            for (auto& object : m_sceneObjects) {
+                object.draw(m_sceneCommandList, RootObjectConstantBuffer, m_frameIndex);
+            }
+
+            m_dsvHandle.Offset(m_dsvDescriptorSize);
+        }
+
+        m_dsvHandle = m_shadowMap.DSVShadowCubeMaps();
         // Point Lights
         for (UINT i = 0; i < m_shadowMap.getNumberOfPointLights(); ++i) {
             for (UINT j = 0; j < 6; ++j) {
@@ -908,6 +983,7 @@ void Application::populateCommandLists() {
                 m_dsvHandle.Offset(m_dsvDescriptorSize);
             }
         }
+
         PIXEndEvent(m_sceneCommandList.Get());
     }
 
@@ -943,10 +1019,15 @@ void Application::populateCommandLists() {
         const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
         m_sceneCommandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
         m_sceneCommandList->ClearDepthStencilView(m_dsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-;
+
+        // Draw objects
         for (auto& object : m_sceneObjects) {
             object.draw(m_sceneCommandList, RootObjectConstantBuffer, m_frameIndex);
         }
+
+        // Draw environment
+        m_sceneCommandList->SetPipelineState(m_environmentPipelineState.Get());
+        m_cubeMesh.draw(m_sceneCommandList);
 
         PIXEndEvent(m_sceneCommandList.Get());
     }

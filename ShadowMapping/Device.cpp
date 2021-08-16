@@ -39,7 +39,11 @@ void Device::init(D3D_FEATURE_LEVEL featureLevel, ComPtr<IDXGIFactory7> factory)
     ComPtr<IDXGIAdapter1> adapter;
     hardwareAdaptor = nullptr;
 
+#ifdef _DEBUG
     for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != m_factory->EnumAdapters1(adapterIndex, &adapter); ++adapterIndex)
+#else
+    for (UINT adapterIndex = 0; DXGI_ERROR_NOT_FOUND != m_factory->EnumAdapterByGpuPreference(adapterIndex, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&adapter)); ++adapterIndex)
+#endif
     {
         DXGI_ADAPTER_DESC1 desc;
         adapter->GetDesc1(&desc);
@@ -47,7 +51,6 @@ void Device::init(D3D_FEATURE_LEVEL featureLevel, ComPtr<IDXGIFactory7> factory)
         if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)
         {
             // Don't select the Basic Render Driver adapter.
-            // If you want a software adapter, pass in "/warp" on the command line.
             continue;
         }
 

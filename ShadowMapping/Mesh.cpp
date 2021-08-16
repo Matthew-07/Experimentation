@@ -247,6 +247,103 @@ void Mesh::initAsGrid(UINT width, UINT height, float horizontalSpacing, float ve
 	}
 }
 
+void Mesh::initAsCube(float size)
+{
+	m_numberOfVertices = 8;
+	m_numberOfIndices = 12 * 3;
+
+	m_vertices = new char[m_vertexSize * m_numberOfVertices];
+	m_indices = new UINT32[m_numberOfIndices];
+
+	size /= 2.f;
+
+	double positions[8][4] =
+	{
+		{ -size, -size, -size, 1.f},
+		{ size, -size, -size, 1.f},
+		{ -size, size, -size, 1.f},
+		{ size, size, -size, 1.f},
+
+		{ -size, -size, size, 1.f},
+		{ size, -size, size, 1.f},
+		{ -size, size, size, 1.f},
+		{ size, size, size, 1.f},
+	};
+
+	//double normals[6][4] =
+	//{
+	//	{ 1.f, 0.f, 0.f, 0.f },
+	//	{ -1.f, 0.f, 0.f, 0.f },
+
+	//	{ 0.f, 1.f, 0.f, 0.f },
+	//	{ 0.f, -1.f, 0.f, 0.f },
+
+	//	{ 0.f, 0.f, 1.f, 0.f },
+	//	{ 0.f, 0.f, -1.f, 0.f },
+	//};
+
+	//double texCoords[4][2] = {
+	//	{ 0.f, 0.f },
+	//	{ 0.f, 1.f },
+	//	{ 1.f, 0.f },
+	//	{ 1.f, 1.f },
+	//}
+
+	ElementDescriptor* positionDescriptor = nullptr;// , * normalDescriptor = nullptr, * textureDescriptor = nullptr;
+	for (UINT i = 0; i < m_numberOfDescriptors; ++i) {
+		if (m_elementDescriptors[i].label == "position") {
+			positionDescriptor = m_elementDescriptors + i;
+		}
+		//else if (m_elementDescriptors[i].label == "normal") {
+		//	normalDescriptor = m_elementDescriptors + i;
+		//}
+		//else if (m_elementDescriptors[i].label == "texture") {
+		//	textureDescriptor = m_elementDescriptors + i;
+		//}
+	}
+
+	if (positionDescriptor == nullptr) throw std::exception("Element descriptors do not contain position data.");
+
+	for (int i = 0; i < 8; ++i) {
+		UINT offset = 0;
+		char* data = new char[4 * getDataSize(positionDescriptor->type)];
+		convertData(positionDescriptor->type, positions[i][0], data + offset);
+		offset += getDataSize(positionDescriptor->type);
+		convertData(positionDescriptor->type, positions[i][1], data + offset);
+		offset += getDataSize(positionDescriptor->type);
+		convertData(positionDescriptor->type, positions[i][2], data + offset);
+		offset += getDataSize(positionDescriptor->type);
+		convertData(positionDescriptor->type, positions[i][3], data + offset);
+
+		memcpy(m_vertices + m_vertexSize * i + positionDescriptor->offset,
+			data, positionDescriptor->size * getDataSize(positionDescriptor->type));
+
+		delete[] data;
+	}
+
+	UINT32 indices[] = {
+		0, 1, 2,
+		1, 3, 2,
+
+		0, 4, 5,
+		0, 5, 1,
+
+		1, 5, 7,
+		1, 7, 3,
+
+		3, 7, 6,
+		3, 6, 2,
+
+		2, 6, 4,
+		2, 4, 0,
+
+		4, 6, 5,
+		5, 6, 7,
+	};
+
+	memcpy(m_indices, &indices, sizeof(UINT32) * m_numberOfIndices);
+}
+
 void Mesh::scheduleUpload(ComPtr<ID3D12Device> m_device, ComPtr<ID3D12GraphicsCommandList> m_commandList) {
 	// Create the vertex buffer.
 	auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);

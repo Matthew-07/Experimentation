@@ -51,8 +51,8 @@ XMMATRIX ShadowMap::getLightMatrix(PointLight l, UINT index)
 
 XMMATRIX ShadowMap::getLightMatrix(DirectionalLight l)
 {
-	XMVECTOR position = XMLoadFloat3(&l.position), direction = XMLoadFloat3(&l.direction);
-	return XMMatrixLookToLH(position, direction, XMVectorSet(0.f, 1.f, 0.f, 0.f)) * XMMatrixOrthographicLH(l.width, l.height, 0.1f, 100.f);
+	XMVECTOR position = XMLoadFloat3(&l.position), direction = XMLoadFloat3(&l.direction), upDirection = XMLoadFloat3(&l.upDirection);
+	return XMMatrixLookToLH(position, direction, upDirection) * XMMatrixOrthographicLH(l.width, l.height, 0.1f, 100.f);
 }
 
 void ShadowMap::transitionWrite(ComPtr<ID3D12GraphicsCommandList> m_commandList)
@@ -317,6 +317,14 @@ void ShadowMap::updatePointLight(const PointLight& data, UINT32 index)
 void ShadowMap::updateDirectionalLight(const DirectionalLight& data, UINT32 index)
 {
 	m_directionalLights[index] = data;
+	XMVECTOR position = XMLoadFloat3(&data.position), 
+		direction = XMLoadFloat3(&data.direction), 
+		upDirection = XMLoadFloat3(&data.upDirection);
+	/*XMStoreFloat4x4(&m_directionalLights[index].shadowTransform, XMMatrixLookToLH(position, direction, upDirection) * XMMatrixOrthographicLH(data.width, data.height, 0.1f, 100.f));*/	
+	XMStoreFloat3(&m_directionalLights[index].direction, XMVector3Normalize(XMLoadFloat3(&m_directionalLights[index].direction)));
+	XMStoreFloat3(&m_directionalLights[index].upDirection, XMVector3Normalize(XMLoadFloat3(&m_directionalLights[index].upDirection)));
+
+	m_directionalLights[index].shadowTransform = getLightMatrix(m_directionalLights[index]);
 }
 
 void ShadowMap::updateConstantBuffers(UINT frameIndex)
@@ -351,5 +359,5 @@ void ShadowMap::setPointConstantBuffer(ComPtr<ID3D12GraphicsCommandList> m_comma
 void ShadowMap::setDirectionalConstantBuffer(ComPtr<ID3D12GraphicsCommandList> m_commandList, UINT rootArgument, UINT frameIndex, UINT lightIndex)
 {
 	m_commandList->SetGraphicsRootConstantBufferView(rootArgument,
-		m_pointLightCBs[lightIndex].buffer->GetGPUVirtualAddress() + sizeof(SceneConstantBuffer) * frameIndex);
+		m_directionalLightCBs[lightIndex].buffer->GetGPUVirtualAddress() + sizeof(SceneConstantBuffer) * frameIndex);
 }

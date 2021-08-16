@@ -18,15 +18,17 @@ struct PointLight
 	}
 };
 
-struct DirectionalLight
+struct DirectionalLight // 32
 {
-	XMFLOAT4X4 shadowTransform;
-	XMFLOAT3 direction;
-	float width;
-	XMFLOAT3 color;
-	float height;
-	XMFLOAT3 position;
-	float intensity;
+	XMMATRIX shadowTransform; // 16
+	XMFLOAT3 direction; // 3
+	float width; // 1
+	XMFLOAT3 color; // 3
+	float height; // 1
+	XMFLOAT3 position; // 3
+	float padding; // 1
+	XMFLOAT3 upDirection; // 3
+	float intensity; // 1
 };
 
 class ShadowMap
@@ -115,7 +117,7 @@ private:
 	UINT m_frameCount;
 
 	//UINT m_width = 512, m_height = 512;
-	UINT m_width = 1024, m_height = 1024;
+	UINT m_width = 1024 * 4, m_height = 1024 * 4;
 	DXGI_FORMAT m_format = DXGI_FORMAT_D32_FLOAT;
 	//DXGI_FORMAT m_format = DXGI_FORMAT_D24_UNORM_S8_UINT;
 

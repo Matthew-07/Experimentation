@@ -104,6 +104,8 @@ public:
 	void initAsGrid(UINT width=2, UINT height=2, float horizontalSpacing=1.f, float verticalSpacing=1.f,
 		float horizontalOffset=0.f, float verticalOffset=0.f);
 
+	void initAsCube(float size = 1.f);
+
 	void scheduleUpload(ComPtr<ID3D12Device> device, ComPtr<ID3D12GraphicsCommandList> commandList);
 	void finaliseUpload() {
 		vertexBufferUploadHeap.Reset();

@@ -5,6 +5,8 @@ texture2D diffuseTexture : register(t1);
 texture2D shadowMaps[3] : register(t2);
 TextureCube shadowCubeMaps[3] : register(t5);
 
+TextureCube environmentTexture : register(t0, space1);
+
 // Samplers
 SamplerState postSampler : register(s0);
 SamplerState diffuseSampler : register(s1);
@@ -20,7 +22,7 @@ struct VSInput
 struct PSInput
 {
     float4 position : SV_POSITION;    
-    //float4 shadowPos[3] : POSITION0;
+    float4 shadowPos[3] : POSITION0;
     float3 worldPosition : POSITION3;
     float3 normal : NORMAL;
     float2 tex : TEXCOORD0;
@@ -44,7 +46,9 @@ struct DirectionalLight
     float3 color;
     float height;
     float3 position;
-    float intensity;
+    float padding;
+    float3 upDirection;
+    float intensity;    
 };
 
 struct PointLight
@@ -78,15 +82,25 @@ cbuffer sceneCB : register(b1)
     AmbientLight ambient;
 
     PointLight point_lights[3];
-    uint number_of_lights;    
+    uint number_of_point_lights;
+
+    DirectionalLight directional_lights[3];
+    uint number_of_directional_lights;
 }
 
 float CalculateShadowFactor(float4 shadowPos, uint shadowMapIndex=0) {
     shadowPos.xyz /= shadowPos.w;
+    shadowPos.y *= -1.f;
+    shadowPos.xy = shadowPos.xy / 2.f + 0.5f;
+
+    if (shadowPos.x < 0.f || shadowPos.y < 0.f ||
+        shadowPos.x > 1.f || shadowPos.y > 1.f) {
+        return 0.f;
+    }
 
     float depth = shadowPos.z;
 
-    //Initally, only sample one point in the shadow map (so the function will return 0.f or 1,f)
+    //Initally, only sample one point in the shadow map (so the function will return 0.f or 1.f)
     float percentLit = 0.f;
 
     percentLit += shadowMaps[shadowMapIndex].SampleCmpLevelZero(shadowSampler, shadowPos.xy, depth).x;

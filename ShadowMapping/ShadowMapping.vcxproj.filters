@@ -26,6 +26,9 @@
     <Filter Include="Shaders\Shadows">
       <UniqueIdentifier>{ca4f3e5b-d91f-439f-b9f7-b4914cb88648}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\Environment">
+      <UniqueIdentifier>{c5c83a76-97c2-4a7c-a2a0-e48101fa5a43}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Mesh.h">
@@ -50,6 +53,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Camera.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Cubemap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -78,6 +84,9 @@
     <ClCompile Include="Camera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Cubemap.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shared.hlsli">
@@ -90,6 +99,9 @@
       <Filter>Resource Files</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="texture.DDS">
+      <Filter>Resource Files</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="desertcube1024.dds">
       <Filter>Resource Files</Filter>
     </CopyFileToFolders>
   </ItemGroup>
@@ -108,6 +120,12 @@
     </FxCompile>
     <FxCompile Include="shadows_vertex_shader.hlsl">
       <Filter>Shaders\Shadows</Filter>
+    </FxCompile>
+    <FxCompile Include="environment_vertex_shader.hlsl">
+      <Filter>Shaders\Environment</Filter>
+    </FxCompile>
+    <FxCompile Include="environment_pixel_shader.hlsl">
+      <Filter>Shaders\Environment</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>
