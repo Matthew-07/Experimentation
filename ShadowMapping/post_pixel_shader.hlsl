@@ -13,5 +13,17 @@ float4 main(PostPSInput pin) : SV_TARGET
 		color += postTexture.Load(pin.tex * float2(width, height) , i).xyz;
 	}
 
-	return float4(color / sampleCount, 1.f);
+	float a = 0.6f; // brightness
+	float b = 2.3f; // contrast
+	float gamma = 2.2f;
+
+	color /= (float)sampleCount;
+
+	// Tone mapping
+	color = pow(color, b);
+	color = color / (color + pow(0.5 / a, b));
+
+	// Display encoding
+	color = pow(color, 1.f / gamma);
+	return float4(color, 1.f);
 }

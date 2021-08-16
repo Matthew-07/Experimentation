@@ -218,6 +218,12 @@ void Application::createResolutionDependentResources()
 
 void Application::createSwapchain()
 {
+    //BOOL allowTearing = FALSE;
+    //HRESULT hr = m_device.getFactory()->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allowTearing, sizeof(allowTearing));
+
+    //m_tearingSupport = SUCCEEDED(hr) && allowTearing;
+    m_tearingSupport = true;
+
     // Describe and create the command queue.
     D3D12_COMMAND_QUEUE_DESC queueDesc = {};
     queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
